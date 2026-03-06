@@ -1,0 +1,41 @@
+.page {
+  width: 100%;
+  padding: 24px;
+  background: var(--neu-bg);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.form {
+  background: var(--neu-bg);
+  padding: 20px;
+  margin-bottom: 24px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--neu-shadow);
+  border: none;
+}
+
+.form input,
+.form select {
+  margin: 8px 6px;
+  padding: 12px 16px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--neu-bg);
+  box-shadow: inset 4px 4px 8px rgba(163, 177, 198, 0.4),
+    inset -4px -4px 8px rgba(255, 255, 255, 0.6);
+  color: var(--text-main);
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+.form input:focus,
+.form select:focus {
+  box-shadow: inset 4px 4px 8px rgba(163, 177, 198, 0.5),
+    inset -4px -4px 8px rgba(255, 255, 255, 0.7),
+    0 0 0 2px rgba(66, 153, 225, 0.3);
+}

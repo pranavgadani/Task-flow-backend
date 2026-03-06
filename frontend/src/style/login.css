@@ -1,0 +1,118 @@
+.login-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: #e0e5ec;
+    padding: 20px;
+    font-family: 'Outfit', sans-serif;
+}
+
+.login-card {
+    background: #e0e5ec;
+    padding: 56px 48px;
+    border-radius: 32px;
+    box-shadow: 20px 20px 60px #bec3c9,
+        -20px -20px 60px #ffffff;
+    width: 100%;
+    max-width: 440px;
+    text-align: center;
+    animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    border: none;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(40px) scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.login-card h2 {
+    margin-bottom: 40px;
+    color: #0f172a;
+    font-size: 36px;
+    font-weight: 900;
+    letter-spacing: -1px;
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+}
+
+.form-group {
+    text-align: left;
+}
+
+.input-label {
+    display: block;
+    margin-bottom: 12px;
+    font-weight: 800;
+    color: #64748b;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding-left: 4px;
+}
+
+.input-field {
+    width: 100%;
+    padding: 16px 20px;
+    border: none;
+    border-radius: 16px;
+    font-size: 15px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    background: #e0e5ec;
+    color: #1e293b;
+    box-shadow: inset 6px 6px 12px #bec3c9,
+        inset -6px -6px 12px #ffffff;
+}
+
+.input-field:focus {
+    outline: none;
+    box-shadow: inset 3px 3px 6px #bec3c9,
+        inset -3px -3px 6px #ffffff;
+}
+
+.submit-button {
+    background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
+    color: #ffffff;
+    padding: 18px;
+    border: none;
+    border-radius: 16px;
+    font-size: 16px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    margin-top: 16px;
+    box-shadow: 0 10px 20px rgba(99, 102, 241, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.submit-button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 15px 30px rgba(99, 102, 241, 0.5);
+    filter: brightness(1.1);
+}
+
+.submit-button:active {
+    transform: translateY(-1px);
+    box-shadow: 0 5px 15px rgba(99, 102, 241, 0.4);
+}
+
+.login-footer {
+    margin-top: 40px;
+    font-size: 13px;
+    color: #94a3b8;
+    font-weight: 600;
+}

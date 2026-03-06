@@ -1,0 +1,734 @@
+/* CSS Variables for Global Theme (Neumorphism Style) */
+:root {
+  /* Neumorphic Core - More refined for Premium Look */
+  --neu-bg: #eaf0f6;
+  --neu-dark-shadow: rgba(163, 177, 198, 0.45);
+  --neu-light-shadow: rgba(255, 255, 255, 0.95);
+
+  /* Shadows - Enhanced Depth */
+  --neu-shadow: 8px 8px 16px var(--neu-dark-shadow),
+    -8px -8px 16px var(--neu-light-shadow);
+  --neu-shadow-hover: 12px 12px 24px var(--neu-dark-shadow),
+    -12px -12px 24px var(--neu-light-shadow);
+  --neu-shadow-active: inset 6px 6px 12px var(--neu-dark-shadow),
+    inset -6px -6px 12px var(--neu-light-shadow);
+  --neu-shadow-inner: inset 4px 4px 10px rgba(163, 177, 198, 0.5),
+    inset -4px -4px 10px rgba(255, 255, 255, 1);
+  --neu-shadow-sm: 4px 4px 10px rgba(163, 177, 198, 0.35),
+    -4px -4px 10px rgba(255, 255, 255, 1);
+
+  /* Brand Theme Colors - Vibrant & Premium */
+  --chakra-brand-500: #2563eb;
+  --chakra-brand-600: #1d4ed8;
+
+  /* Backgrounds & Surfaces */
+  --ui-bg: var(--neu-bg);
+  --ui-surface: var(--neu-bg);
+  --ui-border: transparent;
+
+  /* Global Text Colors - Sharper Contrast */
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --text-light: #94a3b8;
+
+  /* Semantic / Status Colors */
+  --success-color: #10b981;
+  --danger-color: #ef4444;
+  --warning-color: #f59e0b;
+  --info-color: #3b82f6;
+
+  /* Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+
+  /* Legacy Fallbacks */
+  --primary-color: var(--chakra-brand-500);
+  --primary-hover: var(--chakra-brand-600);
+  --secondary-color: #6b778c;
+  --dark-color: #1e293b;
+}
+
+/* Dark Mode Overrides - Neumorphism */
+[data-theme="dark"] {
+  --neu-bg: #292d32;
+  --neu-dark-shadow: #1c1e22;
+  --neu-light-shadow: #363c42;
+
+  --ui-bg: var(--neu-bg);
+  --ui-surface: var(--neu-bg);
+
+  --header-bg: var(--neu-bg);
+  --header-text: #e2e8f0;
+
+  --sidebar-bg: var(--neu-bg);
+  --sidebar-text: #a0aec0;
+  --sidebar-text-hover: #e2e8f0;
+
+  --text-main: #ffffff;
+  /* Brighter white for dark mode */
+  --text-muted: #cbd5e1;
+
+  --dark-color: #f7fafc;
+  --white: var(--neu-bg);
+
+  --neu-shadow: 8px 8px 16px var(--neu-dark-shadow),
+    -8px -8px 16px var(--neu-light-shadow);
+  --neu-shadow-hover: 10px 10px 20px var(--neu-dark-shadow),
+    -10px -10px 20px var(--neu-light-shadow);
+  --neu-shadow-active: inset 6px 6px 12px var(--neu-dark-shadow),
+    inset -6px -6px 12px var(--neu-light-shadow);
+  --neu-shadow-inner: inset 4px 4px 8px var(--neu-dark-shadow),
+    inset -4px -4px 8px var(--neu-light-shadow);
+  --neu-shadow-sm: 4px 4px 8px var(--neu-dark-shadow),
+    -4px -4px 8px var(--neu-light-shadow);
+}
+
+/* Reset and Base Styles */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--neu-bg);
+  color: var(--text-main);
+  transition: all 0.3s ease;
+}
+
+/* Main layout container */
+.mainLayout {
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 250px;
+  background: var(--neu-bg);
+  color: var(--sidebar-text);
+  padding: 24px;
+  height: 100vh;
+  box-shadow: var(--neu-shadow-sm);
+  /* Side shadow for separation */
+  z-index: 10;
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+}
+
+/* Right Content */
+.content {
+  flex: 1;
+  padding: 16px;
+  background: var(--neu-bg);
+}
+
+/* Page Container */
+.page {
+  width: 100%;
+  padding: 16px 24px;
+  background: transparent;
+  min-height: calc(100vh - 56px);
+  display: flex;
+  flex-direction: column;
+}
+
+.page-container {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--neu-bg);
+}
+
+.page-content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  background: var(--neu-bg);
+}
+
+/* Cards & Containers (e.g. Tables, Modals) */
+.table-container {
+  background: var(--neu-bg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--neu-shadow);
+  margin-top: 16px;
+  border: none;
+  padding-bottom: 16px;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding: 12px 24px;
+  box-shadow: var(--neu-shadow-sm);
+  border-radius: 16px;
+  background: var(--neu-bg);
+  border-bottom: none;
+}
+
+.header h2 {
+  margin: 0;
+  color: var(--text-main);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+/* Button Styles - Neumorphism */
+.btn {
+  padding: 10px 24px;
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  background: var(--neu-bg);
+  color: var(--text-main);
+  box-shadow: var(--neu-shadow-sm);
+}
+
+.btn:hover {
+  box-shadow: var(--neu-shadow);
+  transform: translateY(-2px);
+  color: var(--primary-color);
+}
+
+.btn:active {
+  box-shadow: var(--neu-shadow-active);
+  transform: translateY(0);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: #fff;
+  box-shadow: 4px 4px 12px rgba(37, 99, 235, 0.3),
+    -4px -4px 12px rgba(255, 255, 255, 0.6);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+  color: #fff;
+  box-shadow: 6px 6px 16px rgba(37, 99, 235, 0.4),
+    -6px -6px 16px rgba(255, 255, 255, 0.8);
+}
+
+.btn-primary:active {
+  box-shadow: inset 4px 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.btn-secondary {
+  color: var(--text-main);
+}
+
+.btn-success {
+  color: var(--success-color);
+}
+
+.btn-danger {
+  color: var(--danger-color);
+}
+
+.btn-warning {
+  color: var(--warning-color);
+}
+
+.btn-info {
+  color: var(--info-color);
+}
+
+.btn-light {
+  color: var(--text-muted);
+}
+
+/* Form Styles */
+.form-group {
+  margin-bottom: 24px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: 600;
+  color: var(--text-main);
+  font-size: 14px;
+  padding-left: 4px;
+}
+
+.form-control {
+  width: 100%;
+  padding: 14px 18px;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  transition: all 0.3s ease;
+  background: var(--neu-bg);
+  color: var(--text-main);
+  line-height: 1.5;
+  box-shadow: var(--neu-shadow-inner);
+}
+
+.form-control:focus {
+  outline: none;
+  box-shadow: var(--neu-shadow-inner), 0 0 0 2px rgba(66, 153, 225, 0.3);
+}
+
+.form-control::placeholder {
+  color: var(--text-light);
+}
+
+/* Table Styles - Neumorphism */
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 8px;
+  /* Space between rows */
+  background: var(--neu-bg);
+  border: none;
+  border-radius: var(--radius-lg);
+  font-size: 14px;
+  padding: 0 16px 16px;
+}
+
+.table th {
+  background: transparent;
+  color: var(--text-muted);
+  padding: 10px 20px;
+  text-align: left;
+  font-weight: 800;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  border-bottom: none;
+  box-shadow: none;
+}
+
+.table td {
+  padding: 12px 20px;
+  border: none;
+  vertical-align: middle;
+  color: var(--text-main);
+  font-weight: 600;
+}
+
+.table tbody tr {
+  transition: all 0.2s ease;
+  box-shadow: var(--neu-shadow-sm);
+  border-radius: var(--radius-full);
+  background: var(--neu-bg);
+}
+
+.table tbody tr td:first-child {
+  border-top-left-radius: var(--radius-full);
+  border-bottom-left-radius: var(--radius-full);
+  padding-left: 24px;
+}
+
+.table tbody tr td:last-child {
+  border-top-right-radius: var(--radius-full);
+  border-bottom-right-radius: var(--radius-full);
+  padding-right: 24px;
+}
+
+.table tbody tr:hover {
+  background: var(--neu-bg);
+  transform: translateY(-1px);
+  box-shadow: 6px 6px 16px rgba(163, 177, 198, 0.35),
+    -6px -6px 16px rgba(255, 255, 255, 1);
+  z-index: 10;
+  position: relative;
+}
+
+/* Table Action Buttons */
+.table td .btn {
+  margin-right: 12px;
+  padding: 8px;
+  min-width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  /* Circle buttons like image */
+  box-shadow: 5px 5px 10px rgba(163, 177, 198, 0.35),
+    -5px -5px 10px rgba(255, 255, 255, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  /* Sharper icon color */
+}
+
+.table td .btn:hover {
+  box-shadow: var(--neu-shadow);
+}
+
+.table td .btn:active {
+  box-shadow: var(--neu-shadow-active);
+}
+
+/* Status Badges - Pill shape, depressed or embossed */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  background: var(--neu-bg);
+  box-shadow: var(--neu-shadow-sm);
+  border: none;
+}
+
+.badge-active {
+  color: #10b981;
+}
+
+.badge-inactive {
+  color: #ef4444;
+}
+
+.badge-pending {
+  color: #f59e0b;
+}
+
+.badge-completed {
+  color: #3b82f6;
+}
+
+.badge-in-progress {
+  color: #8b5cf6;
+}
+
+.badge-cancelled {
+  color: #6b7280;
+  box-shadow: var(--neu-shadow-inner);
+}
+
+.badge-high {
+  color: #ef4444;
+}
+
+.badge-medium {
+  color: #f59e0b;
+}
+
+.badge-low {
+  color: #10b981;
+}
+
+.badge-success {
+  color: var(--success-color);
+}
+
+.badge-warning {
+  color: var(--warning-color);
+}
+
+.badge-info {
+  color: var(--info-color);
+}
+
+.badge-danger {
+  color: var(--danger-color);
+}
+
+/* Popup Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(224, 229, 236, 0.8);
+  backdrop-filter: blur(5px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: var(--neu-bg);
+  border-radius: var(--radius-lg);
+  width: 500px;
+  max-width: 90%;
+  max-height: 90vh;
+  /* Don't go past screen height */
+  display: flex;
+  flex-direction: column;
+  /* For scrollable body */
+  box-shadow: var(--neu-shadow);
+  border: none;
+  animation: fadeInDown 0.3s ease forwards;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px;
+  border-bottom: none;
+  background: transparent;
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: var(--text-main);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.modal-close {
+  background: var(--neu-bg);
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text-muted);
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  /* Circle for close button */
+  box-shadow: var(--neu-shadow-sm);
+  transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+  color: var(--text-main);
+  box-shadow: var(--neu-shadow);
+}
+
+.modal-close:active {
+  box-shadow: var(--neu-shadow-active);
+}
+
+.modal-body {
+  padding: 0 24px 24px;
+  overflow-y: auto;
+  /* Scroll if content is long */
+  flex: 1;
+  /* Take up available space */
+}
+
+.modal-footer {
+  padding: 20px 24px;
+  border-top: none;
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  background: transparent;
+}
+
+/* Utility Classes */
+.text-center {
+  text-align: center;
+}
+
+.text-left {
+  text-align: left;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.mt-10 {
+  margin-top: 10px;
+}
+
+.mt-20 {
+  margin-top: 20px;
+}
+
+.mb-10 {
+  margin-bottom: 10px;
+}
+
+.mb-20 {
+  margin-bottom: 20px;
+}
+
+.ml-10 {
+  margin-left: 10px;
+}
+
+.mr-10 {
+  margin-right: 10px;
+}
+
+.p-10 {
+  padding: 10px;
+}
+
+.p-20 {
+  padding: 20px;
+}
+
+.d-flex {
+  display: flex;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.align-center {
+  align-items: center;
+}
+
+.w-100 {
+  width: 100%;
+}
+
+.h-100 {
+  height: 100%;
+}
+
+/* Toast animation */
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Search and Pagination */
+.table-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: transparent;
+  border-bottom: none;
+  gap: 16px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  margin-bottom: 12px;
+}
+
+.search-wrapper {
+  position: relative;
+  flex: 1;
+  max-width: 350px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 12px 16px 12px 42px;
+  border: none;
+  border-radius: var(--radius-full);
+  font-size: 14px;
+  background: var(--neu-bg);
+  color: var(--text-main);
+  box-shadow: inset 4px 4px 10px rgba(163, 177, 198, 0.35),
+    inset -4px -4px 10px rgba(255, 255, 255, 1);
+  transition: all 0.3s ease;
+}
+
+.search-input:focus {
+  outline: none;
+  box-shadow: var(--neu-shadow-inner), 0 0 0 2px rgba(66, 153, 225, 0.3);
+}
+
+.search-icon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.pagination-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 20px 0;
+  background: transparent;
+  border-top: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.pagination-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.page-btn {
+  min-width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  background: var(--neu-bg);
+  box-shadow: var(--neu-shadow-sm);
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--text-main);
+  transition: all 0.2s ease;
+}
+
+.page-btn:hover:not(:disabled) {
+  box-shadow: var(--neu-shadow);
+  transform: translateY(-2px);
+  color: var(--primary-color);
+}
+
+.page-btn.active {
+  box-shadow: var(--neu-shadow-inner);
+  color: var(--primary-color);
+}
+
+.page-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  box-shadow: var(--neu-shadow-sm);
+}
+
+/* Make scrollbar look nicer too */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--neu-bg);
+  box-shadow: var(--neu-shadow-inner);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(163, 177, 198, 0.5);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(163, 177, 198, 0.8);
+}
