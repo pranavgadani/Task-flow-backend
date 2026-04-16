@@ -1,17 +1,30 @@
 import { useEffect, useState, useRef } from "react";
+import { Link } from "react-router-dom";
+import ConfirmModal from "../components/common/ConfirmModal";
+import { useCompany } from "../contexts/CompanyContext";
 import { useProject } from "../contexts/ProjectContext";
 import { useAuth } from "../contexts/AuthContext";
+import { useToast } from "../contexts/ToastContext";
 import API from "../api/api";
 import "./header.css";
 
 export default function Header() {
     const [projects, setProjects] = useState([]);
     const { selectedProject, setSelectedProject } = useProject();
+    const { selectedCompany, setSelectedCompany } = useCompany();
     const { user, logout } = useAuth();
+    const { showToast } = useToast();
+    const [companies, setCompanies] = useState([]);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [isCompanyDropdownOpen, setIsCompanyDropdownOpen] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const dropdownRef = useRef(null);
+    const companyDropdownRef = useRef(null);
     const profileRef = useRef(null);
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+    const isSuperAdmin = user?.email === "gadanipranav@gmail.com" || user?.role?.name === "Super Admin";
+    const isOwnerOrAdmin = user?.role?.name === "Company Owner" || isSuperAdmin;
 
     // Dark Mode State
     const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -41,9 +54,21 @@ export default function Header() {
             });
     };
 
+    const loadCompanies = () => {
+        if (!isSuperAdmin) return;
+        API.get("/companies")
+            .then((res) => {
+                setCompanies(res.data || []);
+            })
+            .catch((err) => {
+                console.log('Error loading companies:', err);
+            });
+    };
+
     useEffect(() => {
         loadProjects();
-    }, []);
+        if (isSuperAdmin) loadCompanies();
+    }, [selectedCompany]); // Reload projects when company changes
 
     useEffect(() => {
         console.log('State changed:', { isDropdownOpen, selectedProject, projects: projects.length });
@@ -53,6 +78,9 @@ export default function Header() {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setIsDropdownOpen(false);
+            }
+            if (companyDropdownRef.current && !companyDropdownRef.current.contains(event.target)) {
+                setIsCompanyDropdownOpen(false);
             }
             if (profileRef.current && !profileRef.current.contains(event.target)) {
                 setIsProfileOpen(false);
@@ -74,15 +102,25 @@ export default function Header() {
         setIsDropdownOpen(false);
     };
 
+    const handleCompanySelect = (company) => {
+        setSelectedCompany(company);
+        setSelectedProject(null); // Clear selected project when company changes
+        setIsCompanyDropdownOpen(false);
+    };
+
+    const handleAllCompaniesClick = () => {
+        setSelectedCompany(null);
+        setSelectedProject(null);
+        setIsCompanyDropdownOpen(false);
+    };
+
     return (
         <div className="app-header">
-            {/* Left: Project dropdown */}
             <div className="app-header__brand">
-                <div className="project-dropdown" ref={dropdownRef} style={{ marginLeft: 0 }}>
+                <div className="project-dropdown" ref={dropdownRef}>
                     <button
                         className="project-dropdown__trigger"
                         onClick={() => {
-                            console.log('Button clicked:', { selectedProject, isDropdownOpen });
                             if (!isDropdownOpen) loadProjects();
                             setIsDropdownOpen(!isDropdownOpen);
                         }}
@@ -101,14 +139,8 @@ export default function Header() {
                             </button>
                             {projects
                                 .filter(p => {
-                                    // Superadmin sees all
-                                    const isSuperAdmin = user?.email === "gadanipranav@gmail.com" || user?.role?.name === "Super Admin";
-                                    if (isSuperAdmin) return true;
-                                    // Others see only assigned projects
-                                    return (p.assignedTo || []).some(member => {
-                                        const memberId = member._id || member;
-                                        return memberId.toString() === user?._id?.toString();
-                                    });
+                                    if (isSuperAdmin || user?.role?.name === "Company Owner") return true;
+                                    return (p.assignedTo || []).some(m => (m._id || m).toString() === user?._id?.toString());
                                 })
                                 .map((p) => (
                                     <button
@@ -122,13 +154,54 @@ export default function Header() {
                         </div>
                     )}
                 </div>
+
+                {/* SuperAdmin Company Dropdown */}
+                {isSuperAdmin && (
+                    <div className="project-dropdown" ref={companyDropdownRef}>
+                        <button
+                            className="project-dropdown__trigger"
+                            onClick={() => setIsCompanyDropdownOpen(!isCompanyDropdownOpen)}
+                        >
+                            {selectedCompany ? selectedCompany.companyName : "All Companies"}
+                            <span className={`project-dropdown__arrow ${isCompanyDropdownOpen ? 'open' : ''}`}>▼</span>
+                        </button>
+
+                        {isCompanyDropdownOpen && (
+                            <div className="project-dropdown__menu">
+                                <button
+                                    className={`project-dropdown__item ${!selectedCompany ? "active" : ""}`}
+                                    onClick={handleAllCompaniesClick}
+                                >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg> All Companies
+                                </button>
+                                {companies.map((c) => (
+                                    <button
+                                        key={c._id}
+                                        className={`project-dropdown__item ${selectedCompany?._id === c._id ? "active" : ""}`}
+                                        onClick={() => handleCompanySelect(c)}
+                                    >
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="9" y1="3" x2="9" y2="21" /></svg> {c.companyName}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Center: Empty tabs to keep spacing if needed */}
             <nav className="app-header__tabs">
             </nav>
 
+
             <div className="app-header__right">
+                <Link to="/chat" className="theme-toggle-btn" title="Messages">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                </Link>
+
+
                 <button
                     onClick={toggleTheme}
                     className="theme-toggle-btn"
@@ -179,10 +252,17 @@ export default function Header() {
                                         </div>
                                     </div>
                                 </div>
+                                <div className="profile-dropdown__divider"></div>
+
+                                {isOwnerOrAdmin && (
+                                    <button className="profile-dropdown__item" onClick={() => { setIsProfileOpen(false); window.location.href='/profile'; }}>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '12px' }}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Company Settings
+                                    </button>
+                                )}
 
                                 <div className="profile-dropdown__divider"></div>
 
-                                <button className="profile-dropdown__item logout-item" onClick={logout}>
+                                <button className="profile-dropdown__item logout-item" onClick={() => setShowLogoutConfirm(true)}>
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '12px' }}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg> Logout
                                 </button>
                             </div>
@@ -190,6 +270,17 @@ export default function Header() {
                     </div>
                 )}
             </div>
+            <ConfirmModal
+                show={showLogoutConfirm}
+                onClose={() => setShowLogoutConfirm(false)}
+                onConfirm={async () => {
+                    await logout();
+                    showToast("Logout Successful. See you soon!");
+                }}
+                title="Logout Confirmation"
+                message="Are you sure you want to logout?"
+                confirmText="Logout"
+            />
         </div >
     );
 }

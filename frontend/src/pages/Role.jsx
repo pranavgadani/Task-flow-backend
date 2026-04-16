@@ -4,18 +4,40 @@ import DataTable from "../components/common/DataTable";
 import FormModal from "../components/common/FormModal";
 import PageHeader from "../components/common/PageHeader";
 import API from "../api/api";
+import { TextInput, SelectField } from "../components/common/FormFields";
+import { useAuth } from "../contexts/AuthContext";
+import { usePermissions } from "../contexts/PermissionContext";
+import { useCompany } from "../contexts/CompanyContext";
 
 export default function Role() {
   const [roles, setRoles] = useState([]);
   const [permissions, setPermissions] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [toast, setToast] = useState(null);
+  const { user } = useAuth();
+  const { hasPermission: ctxHasPermission } = usePermissions();
+  const { selectedCompany } = useCompany();
+
+  const isSuperAdmin = user?.email === "gadanipranav@gmail.com" || user?.role?.name === "Super Admin";
+  const isCompanyOwner = user?.role?.name === "Company Owner";
+
+  const hasPermission = (module, action = "read") => {
+    if (isSuperAdmin || isCompanyOwner) return true;
+    return ctxHasPermission(module, action);
+  };
 
   const [form, setForm] = useState({
     name: "",
-    status: "Active",
+    status: "",
     permissions: []
   });
+
+  // Toast notification
+  const showToast = (msg, type = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 1000);
+  };
 
   // LOAD ROLES
   const load = async () => {
@@ -42,10 +64,33 @@ export default function Role() {
   useEffect(() => {
     load();
     loadPermissions();
-  }, []);
+  }, [selectedCompany]);
 
   // SAVE
   const save = async () => {
+    // Validation
+    const nameRegex = /^[a-zA-Z0-9\s]+$/;
+    if (!form.name.trim()) {
+      showToast("Role name is required", "error");
+      return;
+    }
+    if (form.name.length > 50) {
+      showToast("Role name must be 50 characters or less", "error");
+      return;
+    }
+    if (!nameRegex.test(form.name.trim())) {
+      showToast("Role name can only contain letters, numbers and spaces", "error");
+      return;
+    }
+    if (!form.status) {
+      showToast("Please select a status", "error");
+      return;
+    }
+    if (form.permissions.length === 0) {
+      showToast("Please assign at least one permission", "error");
+      return;
+    }
+
     try {
       // LOG: Show what we're sending to backend
       console.log("=== SAVING ROLE ===");
@@ -53,9 +98,33 @@ export default function Role() {
       console.log("Form data:", JSON.stringify(form, null, 2));
 
       if (editId) {
+        const originalRole = roles.find(r => r._id === editId);
+        if (originalRole) {
+            const isSameName = originalRole.name === form.name.trim();
+            const isSameStatus = originalRole.status === form.status;
+            
+            // Basic deep comparison of permissions
+            let isSamePermissions = false;
+            if (originalRole.permissions && form.permissions) {
+                const orgPerms = [...originalRole.permissions].sort((a,b) => a.value?.localeCompare(b.value));
+                const formPerms = [...form.permissions].sort((a,b) => a.value?.localeCompare(b.value));
+                isSamePermissions = JSON.stringify(orgPerms) === JSON.stringify(formPerms);
+            }
+            // For older records or missing perms
+            if (!originalRole.permissions && form.permissions.length === 0) isSamePermissions = true;
+
+            if (isSameName && isSameStatus && isSamePermissions) {
+                showToast("No changes detected.", "info");
+                resetForm();
+                setShowForm(false);
+                return;
+            }
+        }
         await API.put(`/roles/${editId}`, form);
+        showToast("Role updated successfully!");
       } else {
         await API.post("/roles", form);
+        showToast("Role added successfully!");
       }
 
       resetForm();
@@ -63,6 +132,7 @@ export default function Role() {
       load();
     } catch (error) {
       console.error("Error saving role:", error);
+      showToast("Error saving role", "error");
     }
   };
 
@@ -70,7 +140,7 @@ export default function Role() {
   const resetForm = () => {
     setForm({
       name: "",
-      status: "Active",
+      status: "",
       permissions: []
     });
     setEditId(null);
@@ -78,6 +148,10 @@ export default function Role() {
 
   // EDIT
   const edit = (item) => {
+    if (item.name === "Super Admin") {
+      showToast("Super Admin role cannot be edited", "error");
+      return;
+    }
     // Convert old permission format to new format if needed
     const convertedPermissions = (item.permissions || []).map(perm => {
       if (perm.permissionId) {
@@ -107,13 +181,18 @@ export default function Role() {
 
   // DELETE
   const remove = async (id) => {
-    if (window.confirm("Are you sure you want to delete this role?")) {
-      try {
-        await API.delete(`/roles/${id}`);
-        load();
-      } catch (error) {
-        console.error("Error deleting role:", error);
-      }
+    const item = roles.find(r => r._id === id);
+    if (item && item.name === "Super Admin") {
+      showToast("Super Admin role cannot be deleted", "error");
+      return;
+    }
+    try {
+      await API.delete(`/roles/${id}`);
+      showToast("Role deleted successfully!", "delete");
+      load();
+    } catch (error) {
+      console.error("Error deleting role:", error);
+      showToast("Error deleting role", "error");
     }
   };
 
@@ -134,39 +213,46 @@ export default function Role() {
         [action]: value
       };
 
-      // If "all" is checked, check all other actions
-      if (action === 'all' && value) {
+      // If "all" is checked, check all other actions. If unchecked, uncheck all.
+      if (action === 'all') {
         updatedPermissions[existingPermissionIndex] = {
           ...updatedPermissions[existingPermissionIndex],
-          create: true,
-          read: true,
-          update: true,
-          delete: true
+          all: value,
+          create: value,
+          read: value,
+          update: value,
+          delete: value
         };
-      } else if (action !== 'all' && !value) {
-        // If any individual action is unchecked, uncheck "all"
-        updatedPermissions[existingPermissionIndex].all = false;
+      } else {
+        // Update individual action
+        updatedPermissions[existingPermissionIndex] = {
+          ...updatedPermissions[existingPermissionIndex],
+          [action]: value
+        };
+        
+        // Auto-check "all" if all individual actions are true
+        const p = updatedPermissions[existingPermissionIndex];
+        if (p.create && p.read && p.update && p.delete) {
+          p.all = true;
+        } else {
+          p.all = false;
+        }
       }
     } else {
       // Add new permission with name and value
       const newPermission = {
         name: permission.name,
         value: permission.value,
-        all: false,
-        create: false,
-        read: false,
-        update: false,
-        delete: false
+        all: action === 'all' ? value : false,
+        create: (action === 'all' && value) || (action === 'create' && value),
+        read: (action === 'all' && value) || (action === 'read' && value),
+        update: (action === 'all' && value) || (action === 'update' && value),
+        delete: (action === 'all' && value) || (action === 'delete' && value)
       };
-
-      if (action === 'all' && value) {
+      
+      // Secondary check for new permission auto-all
+      if (newPermission.create && newPermission.read && newPermission.update && newPermission.delete) {
         newPermission.all = true;
-        newPermission.create = true;
-        newPermission.read = true;
-        newPermission.update = true;
-        newPermission.delete = true;
-      } else {
-        newPermission[action] = value;
       }
 
       updatedPermissions.push(newPermission);
@@ -183,21 +269,12 @@ export default function Role() {
 
   // TABLE COLUMNS
   const columns = [
-    { header: "Name", key: "name" },
+    { header: "Name", key: "name", width: "60%" },
     {
       header: "Status",
       key: "status",
       render: (v) => (
-        <span style={{
-          padding: "6px 14px",
-          borderRadius: "20px",
-          fontSize: "11px",
-          fontWeight: "800",
-          background: v === "Active" ? "#dcfce7" : "#fee2e2",
-          color: v === "Active" ? "#16a34a" : "#dc2626",
-          textTransform: "uppercase",
-          letterSpacing: "0.5px"
-        }}>
+        <span className={`badge badge-${v?.toLowerCase() === 'active' ? 'active' : 'inactive'}`}>
           {v || "Active"}
         </span>
       )
@@ -208,7 +285,7 @@ export default function Role() {
     <div className="page">
       <PageHeader
         title="Role Management"
-        buttonText="+ Add Role"
+        buttonText={hasPermission("role_management", "create") ? "+ Add Role" : null}
         onButtonClick={() => setShowForm(true)}
       />
 
@@ -225,158 +302,118 @@ export default function Role() {
         maxWidth="800px"
       >
         <div style={{ display: 'flex', gap: '30px', marginBottom: '15px' }}>
-          <div className="form-group" style={{ flex: 1 }}>
-            <label style={{ color: 'var(--text-muted)', marginBottom: '10px', fontSize: '14px', fontWeight: '800' }}>Role Name</label>
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Enter role name"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              style={{
-                padding: '14px 18px',
-                border: 'none',
-                borderRadius: '12px',
-                background: 'var(--neu-bg)',
-                boxShadow: 'var(--neu-shadow-sm)', // Changed to raised shadow
-                color: 'var(--text-main)'
-              }}
-            />
-          </div>
+          <TextInput
+            label="Role Name"
+            placeholder="Enter role name"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            maxLength={50}
+            required
+            className="role-name-field"
+            style={{ flex: 1 }}
+          />
 
-          <div className="form-group" style={{ flex: 1 }}>
-            <label style={{ color: 'var(--text-muted)', marginBottom: '10px', fontSize: '14px', fontWeight: '800' }}>Status</label>
-            <select
-              className="form-control"
-              value={form.status}
-              onChange={(e) => setForm({ ...form, status: e.target.value })}
-              style={{
-                padding: '14px 18px',
-                border: 'none',
-                borderRadius: '12px',
-                background: 'var(--neu-bg)',
-                boxShadow: 'var(--neu-shadow-sm)', // Changed to raised shadow
-                color: 'var(--text-main)',
-                appearance: 'auto'
-              }}
-            >
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
-          </div>
+          <SelectField
+            label="Status"
+            value={form.status}
+            onChange={(e) => setForm({ ...form, status: e.target.value })}
+            options={[
+              { value: "", label: "Select Status" },
+              { value: "Active", label: "Active" },
+              { value: "Inactive", label: "Inactive" },
+            ]}
+            required
+            style={{ flex: 1 }}
+          />
         </div>
 
         <div className="form-group" style={{ marginTop: '30px' }}>
-          <label style={{ fontSize: '17px', fontWeight: '800', color: 'var(--text-main)', marginBottom: '15px', display: 'block' }}>
-            Permissions
+          <label style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '12px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Permissions Matrix
           </label>
           <div className="permissions-table-container" style={{
-            background: 'var(--neu-bg)',
-            borderRadius: '16px',
+            background: 'var(--ui-surface)',
+            borderRadius: '12px',
             overflow: 'hidden',
-            boxShadow: 'var(--neu-shadow-sm)'
+            border: '1px solid var(--ui-border)',
+            boxShadow: 'var(--shadow-sm)'
           }}>
             <table style={{
               width: '100%',
               borderCollapse: 'collapse',
             }}>
               <thead>
-                <tr style={{ borderBottom: '1.5px solid #e2e8f0' }}>
+                <tr style={{ borderBottom: '1px solid var(--ui-border)', background: 'var(--ui-bg)' }}>
                   <th style={{
-                    padding: '18px 20px',
+                    padding: '14px 20px',
                     textAlign: 'left',
-                    color: '#475569',
-                    fontSize: '15px',
-                    fontWeight: '800',
-                    borderRight: '1px solid #f1f5f9'
+                    color: 'var(--text-muted)',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
                   }}>
-                    Permission
+                    Module
                   </th>
-                  <th style={{ padding: '18px 10px', textAlign: 'center', color: '#475569', fontSize: '15px', fontWeight: '800', borderRight: '1px solid #f1f5f9', width: '85px' }}>All</th>
-                  <th style={{ padding: '18px 10px', textAlign: 'center', color: '#475569', fontSize: '15px', fontWeight: '800', borderRight: '1px solid #f1f5f9', width: '85px' }}>Read</th>
-                  <th style={{ padding: '18px 10px', textAlign: 'center', color: '#475569', fontSize: '15px', fontWeight: '800', borderRight: '1px solid #f1f5f9', width: '85px' }}>Create</th>
-                  <th style={{ padding: '18px 10px', textAlign: 'center', color: '#475569', fontSize: '15px', fontWeight: '800', borderRight: '1px solid #f1f5f9', width: '85px' }}>Update</th>
-                  <th style={{ padding: '18px 10px', textAlign: 'center', color: '#475569', fontSize: '15px', fontWeight: '800', width: '85px' }}>Delete</th>
+                  <th style={{ padding: '14px 10px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase' }}>All</th>
+                  <th style={{ padding: '14px 10px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase' }}>Read</th>
+                  <th style={{ padding: '14px 10px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase' }}>Create</th>
+                  <th style={{ padding: '14px 10px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase' }}>Update</th>
+                  <th style={{ padding: '14px 10px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase' }}>Delete</th>
                 </tr>
               </thead>
               <tbody>
                 {permissions.map(permission => {
                   const currentPermission = form.permissions.find(p => p.value === permission.value);
                   return (
-                    <tr key={permission._id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <tr key={permission._id} style={{ borderBottom: '1px solid var(--ui-border)' }}>
                       <td style={{
-                        padding: '16px 20px',
+                        padding: '12px 20px',
                         color: 'var(--text-main)',
-                        fontWeight: '700',
-                        fontSize: '14.5px',
-                        borderRight: '1px solid #f1f5f9'
+                        fontWeight: '500',
+                        fontSize: '13.5px',
                       }}>
                         {permission.name}
                       </td>
-                      <td style={{ padding: '16px 10px', textAlign: 'center', borderRight: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                         <input
                           type="checkbox"
                           checked={currentPermission?.all || false}
                           onChange={(e) => handlePermissionChange(permission._id, 'all', e.target.checked)}
-                          style={{
-                            width: '20px',
-                            height: '20px',
-                            cursor: 'pointer',
-                            accentColor: '#2563eb'
-                          }}
+                          style={{ accentColor: 'var(--primary-color)', cursor: 'pointer' }}
                         />
                       </td>
-                      <td style={{ padding: '16px 10px', textAlign: 'center', borderRight: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                         <input
                           type="checkbox"
                           checked={currentPermission?.read || false}
                           onChange={(e) => handlePermissionChange(permission._id, 'read', e.target.checked)}
-                          style={{
-                            width: '20px',
-                            height: '20px',
-                            cursor: 'pointer',
-                            accentColor: '#2563eb'
-                          }}
+                          style={{ accentColor: 'var(--primary-color)', cursor: 'pointer' }}
                         />
                       </td>
-                      <td style={{ padding: '16px 10px', textAlign: 'center', borderRight: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                         <input
-                          type="checkbox"
-                          checked={currentPermission?.create || false}
-                          onChange={(e) => handlePermissionChange(permission._id, 'create', e.target.checked)}
-                          style={{
-                            width: '20px',
-                            height: '20px',
-                            cursor: 'pointer',
-                            accentColor: '#2563eb'
-                          }}
+                           type="checkbox"
+                           checked={currentPermission?.create || false}
+                           onChange={(e) => handlePermissionChange(permission._id, 'create', e.target.checked)}
+                           style={{ accentColor: 'var(--primary-color)', cursor: 'pointer' }}
                         />
                       </td>
-                      <td style={{ padding: '16px 10px', textAlign: 'center', borderRight: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                         <input
                           type="checkbox"
                           checked={currentPermission?.update || false}
                           onChange={(e) => handlePermissionChange(permission._id, 'update', e.target.checked)}
-                          style={{
-                            width: '20px',
-                            height: '20px',
-                            cursor: 'pointer',
-                            accentColor: '#2563eb'
-                          }}
+                          style={{ accentColor: 'var(--primary-color)', cursor: 'pointer' }}
                         />
                       </td>
-                      <td style={{ padding: '16px 10px', textAlign: 'center' }}>
-                        <input
-                          type="checkbox"
-                          checked={currentPermission?.delete || false}
-                          onChange={(e) => handlePermissionChange(permission._id, 'delete', e.target.checked)}
-                          style={{
-                            width: '20px',
-                            height: '20px',
-                            cursor: 'pointer',
-                            accentColor: '#2563eb'
-                          }}
-                        />
+                      <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                         <input
+                           type="checkbox"
+                           checked={currentPermission?.delete || false}
+                           onChange={(e) => handlePermissionChange(permission._id, 'delete', e.target.checked)}
+                           style={{ accentColor: 'var(--primary-color)', cursor: 'pointer' }}
+                         />
                       </td>
                     </tr>
                   );
@@ -391,9 +428,29 @@ export default function Role() {
       <DataTable
         data={roles}
         columns={columns}
-        onEdit={edit}
-        onDelete={remove}
+        onEdit={hasPermission("role_management", "update") ? edit : null}
+        onDelete={hasPermission("role_management", "delete") ? remove : null}
       />
+
+      {/* TOAST */}
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          padding: '16px 24px',
+          borderRadius: '8px',
+          background: toast.type === 'success' ? '#4CAF50' : toast.type === 'delete' ? '#f44336' : toast.type === 'error' ? '#f44336' : '#ff9800',
+          color: 'white',
+          fontSize: '14px',
+          fontWeight: '600',
+          zIndex: 9999,
+          animation: 'slideInRight 0.3s ease-out',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+        }}>
+          {toast.msg}
+        </div>
+      )}
     </div>
   );
 }

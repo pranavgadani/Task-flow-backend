@@ -1,51 +1,23 @@
 import React from "react";
 
-export function FormField({ label, hint, children, className = "" }) {
+export function FormField({ label, hint, children, className = "", required, style }) {
   return (
-    <div className={`form-group ${className}`.trim()} style={{ marginBottom: '22px' }}>
+    <div className={`form-group ${className}`.trim()} style={style}>
       {label ? (
-        <label style={{
-          display: 'block',
-          marginBottom: '10px',
-          fontSize: '13px',
-          fontWeight: '900',
-          color: 'var(--text-muted)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.8px'
-        }}>
-          {label}
+        <label>
+          {label} {required && <span style={{ color: 'var(--danger-color)' }}>*</span>}
         </label>
       ) : null}
       {children}
-      {hint ? <small className="text-muted" style={{ display: 'block', marginTop: '6px', fontSize: '12px', fontWeight: '500' }}>{hint}</small> : null}
+      {hint ? <small style={{ display: 'block', marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>{hint}</small> : null}
     </div>
   );
 }
 
-const commonInputStyle = {
-  width: '100%',
-  padding: '14px 18px',
-  border: 'none',
-  borderRadius: '14px',
-  background: 'var(--neu-bg)',
-  boxShadow: 'var(--neu-shadow-sm)',
-  color: 'var(--text-main)',
-  fontSize: '14px',
-  fontWeight: '600',
-  outline: 'none',
-  transition: 'all 0.3s ease'
-};
-
-export function TextInput({ label, hint, className = "", inputClassName = "", ...props }) {
+export function TextInput({ label, hint, className = "", inputClassName = "", required, style, ...props }) {
   return (
-    <FormField label={label} hint={hint} className={className}>
-      <input
-        className={`form-control ${inputClassName}`.trim()}
-        style={commonInputStyle}
-        onFocus={(e) => e.target.style.boxShadow = 'var(--neu-shadow-inner)'}
-        onBlur={(e) => e.target.style.boxShadow = 'var(--neu-shadow-sm)'}
-        {...props}
-      />
+    <FormField label={label} hint={hint} className={className} required={required} style={style}>
+      <input className={`form-control ${inputClassName}`.trim()} required={required} {...props} />
     </FormField>
   );
 }
@@ -53,44 +25,19 @@ export function TextInput({ label, hint, className = "", inputClassName = "", ..
 export function TextAreaField({ label, hint, className = "", inputClassName = "", ...props }) {
   return (
     <FormField label={label} hint={hint} className={className}>
-      <textarea
-        className={`form-control ${inputClassName}`.trim()}
-        style={{ ...commonInputStyle, height: '100px', resize: 'none' }}
-        onFocus={(e) => e.target.style.boxShadow = 'var(--neu-shadow-inner)'}
-        onBlur={(e) => e.target.style.boxShadow = 'var(--neu-shadow-sm)'}
-        {...props}
-      />
+      <textarea className={`form-control ${inputClassName}`.trim()} style={{ height: '100px', resize: 'none' }} {...props} />
     </FormField>
   );
 }
 
-export function SelectField({
-  label,
-  hint,
-  className = "",
-  selectClassName = "",
-  options,
-  children,
-  ...props
-}) {
+export function SelectField({ label, hint, className = "", selectClassName = "", options, children, required, style, ...props }) {
   return (
-    <FormField label={label} hint={hint} className={className}>
-      <select
-        className={`form-control ${selectClassName}`.trim()}
-        style={{ ...commonInputStyle, appearance: 'auto' }}
-        onFocus={(e) => e.target.style.boxShadow = 'var(--neu-shadow-inner)'}
-        onBlur={(e) => e.target.style.boxShadow = 'var(--neu-shadow-sm)'}
-        {...props}
-      >
-        {options
-          ? options.map((opt) => (
-            <option key={String(opt.value)} value={opt.value} disabled={opt.disabled}>
-              {opt.label}
-            </option>
-          ))
-          : children}
+    <FormField label={label} hint={hint} className={className} required={required} style={style}>
+      <select className={`form-control ${selectClassName}`.trim()} style={{ appearance: 'auto' }} required={required} {...props} >
+        {options ? options.map((opt) => (
+            <option key={String(opt.value)} value={opt.value} disabled={opt.disabled}>{opt.label}</option>
+          )) : children}
       </select>
     </FormField>
   );
 }
-

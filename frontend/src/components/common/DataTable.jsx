@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import ConfirmModal from "./ConfirmModal";
 
 export default function DataTable({
   data = [],
@@ -10,9 +11,15 @@ export default function DataTable({
   emptyText = "No records found",
   pageSize = 10,
   searchPlaceholder = "Search...",
+  // Server-side pagination props
+  serverSide = false,
+  totalRecords = 0,
+  serverCurrentPage = 1,
+  onPageChange = null,
 }) {
   const [search, setSearch] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [localCurrentPage, setLocalCurrentPage] = useState(1);
+  const [deleteId, setDeleteId] = useState(null);
 
   // Filter data based on search
   const filteredData = useMemo(() => {
@@ -35,17 +42,32 @@ export default function DataTable({
     });
   }, [data, search, columns]);
 
-  // Paginate filtered data
-  const totalPages = Math.ceil(filteredData.length / pageSize);
+  // Paginate filtered data (only for client-side)
+  const totalPages = serverSide ? Math.ceil(totalRecords / pageSize) : Math.ceil(filteredData.length / pageSize);
+
   const paginatedData = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
+    if (serverSide) return data; // Data is already paginated from server
+    const start = (localCurrentPage - 1) * pageSize;
     return filteredData.slice(start, start + pageSize);
-  }, [filteredData, currentPage, pageSize]);
+  }, [filteredData, localCurrentPage, pageSize, serverSide, data]);
 
   // Reset page when search changes
   React.useEffect(() => {
-    setCurrentPage(1);
-  }, [search]);
+    if (!serverSide) setLocalCurrentPage(1);
+  }, [search, serverSide]);
+
+  const handlePageChange = (newPage) => {
+    if (serverSide && onPageChange) {
+      onPageChange(newPage);
+    } else {
+      setLocalCurrentPage(newPage);
+    }
+  };
+
+  const displayCurrentPage = serverSide ? serverCurrentPage : localCurrentPage;
+  const displayTotalRecords = serverSide ? totalRecords : filteredData.length;
+  // If server-side is on, we don't have all data to filter client-side, so search is disabled
+  // unless we fire a search API call (skipping for now)
 
   const hasActions = Boolean(onEdit || onDelete || renderActions);
 
@@ -56,12 +78,12 @@ export default function DataTable({
 
   return (
     <div className="table-container">
-      {/* Search Bar */}
+      {/* Search Bar & Stats */}
       <div className="table-controls">
         <div className="search-wrapper">
-          <span className="search-icon" style={{ display: 'flex', color: '#9ca3af' }}>
+          <div className="search-icon">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" x2="16.65" y1="21" y2="16.65" /></svg>
-          </span>
+          </div>
           <input
             type="text"
             className="search-input"
@@ -70,8 +92,8 @@ export default function DataTable({
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div style={{ fontSize: "13px", color: "#666" }}>
-          Total: {filteredData.length} records
+        <div className="table-stats">
+          Total: <span>{displayTotalRecords}</span> records
         </div>
       </div>
 
@@ -88,7 +110,7 @@ export default function DataTable({
         <tbody>
           {paginatedData.length === 0 ? (
             <tr>
-              <td colSpan={columns.length + (hasActions ? 1 : 0)} style={{ padding: 16, color: "#6b778c", textAlign: "center" }}>
+              <td colSpan={columns.length + (hasActions ? 1 : 0)} style={{ padding: 24, color: "#94a3b8", textAlign: "center" }}>
                 {emptyText}
               </td>
             </tr>
@@ -112,37 +134,27 @@ export default function DataTable({
 
                 {hasActions && (
                   <td>
-                    <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-start' }}>
+                    <div className="action-buttons">
                       {renderActions ? (
                         renderActions(row)
                       ) : (
                         <>
                           {onEdit && (
                             <button
-                              className="btn"
+                              className="action-btn"
                               onClick={() => onEdit(row)}
                               title="Edit"
-                              style={{
-                                width: '40px', height: '40px', padding: 0,
-                                borderRadius: '50%', color: '#6366f1',
-                                boxShadow: 'var(--neu-shadow-sm)'
-                              }}
                             >
-                              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
                             </button>
                           )}
                           {onDelete && (
                             <button
-                              className="btn"
-                              onClick={() => onDelete(row?._id)}
+                              className="action-btn delete"
+                              onClick={() => setDeleteId(row?._id)}
                               title="Delete"
-                              style={{
-                                width: '40px', height: '40px', padding: 0,
-                                borderRadius: '50%', color: '#ef4444',
-                                boxShadow: 'var(--neu-shadow-sm)'
-                              }}
                             >
-                              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></svg>
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></svg>
                             </button>
                           )}
                         </>
@@ -158,33 +170,32 @@ export default function DataTable({
 
       {/* Pagination Controls */}
       {totalPages > 1 && (
-        <div className="pagination-controls" style={{ padding: '16px 24px' }}>
-          <div style={{ fontSize: '13px', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>
-            {((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, filteredData.length)} of {filteredData.length} records
+        <div className="pagination-controls">
+          <div className="table-stats">
+            {((displayCurrentPage - 1) * pageSize) + 1} - {Math.min(displayCurrentPage * pageSize, displayTotalRecords)} of <span>{displayTotalRecords}</span> records
           </div>
           <div className="pagination-buttons">
             <button
               className="page-btn"
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage(prev => prev - 1)}
-              style={{ padding: '0 15px', borderRadius: '12px' }}
+              disabled={displayCurrentPage === 1}
+              onClick={() => handlePageChange(displayCurrentPage - 1)}
             >
               PREV
             </button>
 
             {[...Array(totalPages)].map((_, i) => {
               const pageNum = i + 1;
-              if (pageNum === 1 || pageNum === totalPages || (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)) {
+              if (pageNum === 1 || pageNum === totalPages || (pageNum >= displayCurrentPage - 1 && pageNum <= displayCurrentPage + 1)) {
                 return (
                   <button
                     key={pageNum}
-                    className={`page-btn ${currentPage === pageNum ? 'active' : ''}`}
-                    onClick={() => setCurrentPage(pageNum)}
+                    className={`page-btn ${displayCurrentPage === pageNum ? 'active' : ''}`}
+                    onClick={() => handlePageChange(pageNum)}
                   >
                     {pageNum}
                   </button>
                 );
-              } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+              } else if (pageNum === displayCurrentPage - 2 || pageNum === displayCurrentPage + 2) {
                 return <span key={pageNum} style={{ padding: '0 8px', color: '#94a3b8' }}>...</span>;
               }
               return null;
@@ -192,15 +203,25 @@ export default function DataTable({
 
             <button
               className="page-btn"
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage(prev => prev + 1)}
-              style={{ padding: '0 15px', borderRadius: '12px' }}
+              disabled={displayCurrentPage === totalPages}
+              onClick={() => handlePageChange(displayCurrentPage + 1)}
             >
               NEXT
             </button>
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        show={deleteId !== null}
+        onClose={() => setDeleteId(null)}
+        onConfirm={() => {
+          onDelete(deleteId);
+          setDeleteId(null);
+        }}
+        title="Delete Confirmation"
+        message="Are you sure you want to delete this record?"
+      />
     </div>
   );
 }

@@ -1,262 +1,553 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useProject } from "../contexts/ProjectContext";
+import { useCompany } from "../contexts/CompanyContext";
+import { useSocket } from "../contexts/SocketContext";
 import API from "../api/api";
-import "../style/main.css"; // Reuse existing styles if any, or inline
+import "../style/main.css";
 
 export default function Dashboard() {
   const { user } = useAuth();
   const { selectedProject } = useProject();
+  const { selectedCompany } = useCompany();
+  const { socket, connected } = useSocket();
+  const isSuperAdmin = user?.email === "gadanipranav@gmail.com" || user?.role?.name === "Super Admin";
 
-  const [stats, setStats] = useState({
+    const [stats, setStats] = useState({
     staffCount: 0,
     projectCount: 0,
     taskCount: 0,
     issueCount: 0,
+    completionRate: 0,
+    distribution: { pending: 0, inProgress: 0, stable: 0 }
   });
 
   const [loading, setLoading] = useState(true);
+  const [lastSync, setLastSync] = useState(new Date());
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      setLoading(true);
-      try {
-        // Fetch all necessary data concurrently
-        const [staffRes, projectsRes, allTasksRes] = await Promise.all([
-          API.get("/staff"),
-          API.get("/projects"),
-          API.get(selectedProject ? `/tasks?project=${selectedProject._id}` : "/tasks")
-        ]);
+  const [recentLogs, setRecentLogs] = useState([]);
 
-        const rawStaff = Array.isArray(staffRes.data) ? staffRes.data : staffRes.data?.staff || [];
-        const rawProjects = Array.isArray(projectsRes.data) ? projectsRes.data : [];
-        const rawTasks = Array.isArray(allTasksRes.data) ? allTasksRes.data : [];
+  const fetchDashboardData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [staffRes, projectsRes, allTasksRes] = await Promise.all([
+        API.get("/staff"),
+        API.get("/projects"),
+        API.get(selectedProject ? `/tasks?project=${selectedProject._id}` : "/tasks")
+      ]);
 
-        // Calculate counts
-        let staffCount = rawStaff.length;
-        let projectCount = rawProjects.length;
+      const rawStaff = Array.isArray(staffRes.data) ? staffRes.data : staffRes.data?.staff || [];
+      const rawProjects = Array.isArray(projectsRes.data) ? projectsRes.data : [];
+      let rawTasks = Array.isArray(allTasksRes.data) ? allTasksRes.data : [];
 
-        // If a project is selected, we filter staff and project count to basically just reflect that project scope
-        if (selectedProject) {
-          projectCount = 1; // You are viewing 1 project
-          if (selectedProject.assignedTo && selectedProject.assignedTo.length > 0) {
-            const assignedIds = selectedProject.assignedTo.map(u => u._id || u);
-            staffCount = rawStaff.filter(s => assignedIds.includes(s._id)).length;
-          } else {
-            staffCount = 0;
-          }
+      // Process real logs for the feed
+      const processedLogs = [...rawTasks]
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 3)
+        .map(t => ({
+            msg: `${t.type === 'issue' ? 'Incident' : 'Task'} [${t.title}] Logged`,
+            time: new Date(t.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            type: t.type === 'issue' ? 'error' : 'success'
+        }));
+      setRecentLogs(processedLogs);
+
+      // Calculate Real-time Distribution
+      const total = rawTasks.length;
+      const pendingCount = rawTasks.filter(t => ["pending", "to do", "backlog"].includes(t.status?.name?.toLowerCase() || t.status?.toLowerCase())).length;
+      const stableCount = rawTasks.filter(t => ["done", "completed", "stable", "finished"].includes(t.status?.name?.toLowerCase() || t.status?.toLowerCase())).length;
+      const inProgressCount = total - (pendingCount + stableCount);
+
+      const completionRate = total > 0 ? Math.round((stableCount / total) * 100) : 0;
+      const distribution = {
+        pending: total > 0 ? Math.round((pendingCount / total) * 100) : 0,
+        inProgress: total > 0 ? Math.round((inProgressCount / total) * 100) : 0,
+        stable: total > 0 ? Math.round((stableCount / total) * 100) : 0
+      };
+
+      let staffCount = rawStaff.length;
+      let projectCount = rawProjects.length;
+
+      if (selectedProject) {
+        projectCount = 1;
+        if (selectedProject.assignedTo && selectedProject.assignedTo.length > 0) {
+          const assignedIds = selectedProject.assignedTo.map(u => u._id || u);
+          staffCount = rawStaff.filter(s => assignedIds.includes(s._id)).length;
+        } else {
+          staffCount = 0;
         }
-
-        const taskCount = rawTasks.filter(t => t.type === "task" || !t.type).length;
-        const issueCount = rawTasks.filter(t => t.type === "issue").length;
-
-        setStats({
-          staffCount,
-          projectCount,
-          taskCount,
-          issueCount,
-        });
-
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-      } finally {
-        setLoading(false);
       }
-    };
 
-    fetchDashboardData();
+      const taskCount = rawTasks.filter(t => t.type === "task" || !t.type).length;
+      const issueCount = rawTasks.filter(t => t.type === "issue").length;
+
+      setStats({ 
+        staffCount, projectCount, taskCount, issueCount, 
+        completionRate, distribution 
+      });
+      setLastSync(new Date());
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+    } finally {
+      setLoading(false);
+    }
   }, [selectedProject]);
 
-  const StatCard = ({ title, value, icon, bgColor, color }) => (
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData, selectedCompany]);
+
+  // Real-time socket integration
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleUpdate = () => {
+        console.log("♻️ Real-time Dashboard Update Triggered");
+        fetchDashboardData();
+    };
+
+    socket.on("task:created", handleUpdate);
+    socket.on("task:updated", handleUpdate);
+    socket.on("task:deleted", handleUpdate);
+
+    return () => {
+        socket.off("task:created", handleUpdate);
+        socket.off("task:updated", handleUpdate);
+        socket.off("task:deleted", handleUpdate);
+    };
+  }, [socket, fetchDashboardData]);
+
+  const StatCard = ({ title, value, icon, color, delay }) => (
     <div style={{
-      background: "var(--neu-bg)",
-      borderRadius: "24px",
+      background: "var(--ui-surface)",
+      borderRadius: "16px",
       padding: "24px",
       display: "flex",
-      alignItems: "center",
-      gap: "20px",
-      boxShadow: "var(--neu-shadow-sm)",
-      border: "1px solid rgba(255, 255, 255, 0.05)",
-      transition: "transform 0.2s ease",
-      height: '110px'
-    }}>
+      flexDirection: "column",
+      gap: "16px",
+      boxShadow: `0 10px 30px -10px ${color}33`,
+      border: `1px solid ${color}44`,
+      position: "relative",
+      overflow: "hidden",
+      transition: "all 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
+      animation: `fadeUpIn 0.6s ease backwards ${delay}s`,
+      cursor: 'default'
+    }} className="digital-card">
+      {/* Dynamic Glow Layer */}
       <div style={{
-        background: bgColor,
-        color: color,
-        width: "54px",
-        height: "54px",
-        borderRadius: "14px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: "24px",
-        flexShrink: 0,
-        boxShadow: "inset 2px 2px 5px rgba(0,0,0,0.05)"
-      }}>
-        {icon}
+        position: 'absolute', top: '-15px', right: '-15px', width: '70px', height: '70px',
+        background: color, filter: 'blur(35px)', opacity: 0.18
+      }}></div>
+      
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{
+          background: `${color}15`,
+          color: color,
+          width: "42px",
+          height: "42px",
+          borderRadius: "11px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "18px",
+          border: `1px solid ${color}33`,
+          boxShadow: `0 0 16px ${color}22`
+        }}>
+          {icon}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: color, boxShadow: `0 0 8px ${color}`, animation: 'pulse-glow 1.5s infinite' }}></span>
+            <span style={{ fontSize: '9px', color: color, fontWeight: '900', letterSpacing: '1px' }}>SYNCED</span>
+        </div>
       </div>
-      <div style={{ flex: 1 }}>
+
+      <div>
         <p style={{
           margin: 0,
           color: "var(--text-muted)",
-          fontSize: "11px",
+          fontSize: "10px",
           fontWeight: "800",
           textTransform: "uppercase",
-          letterSpacing: "1px",
-          marginBottom: "2px"
+          letterSpacing: "0.15em",
+          marginBottom: "6px"
         }}>
           {title}
         </p>
-        <h3 style={{ margin: 0, color: "var(--text-main)", fontSize: "28px", fontWeight: "900", lineHeight: 1 }}>
-          {loading ? "..." : value}
-        </h3>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+            <h3 style={{ margin: 0, color: "var(--text-main)", fontSize: "30px", fontWeight: "900", letterSpacing: '-0.8px' }}>
+            {loading ? "..." : value}
+            </h3>
+            {!loading && <span style={{ fontSize: '11px', color: 'var(--success-color)', fontWeight: '800', opacity: 0.8 }}>NETWORK ACTIVE</span>}
+        </div>
       </div>
+      
+      {/* Cybernetic Accent */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: '10%', right: '10%', height: '1px',
+        background: `linear-gradient(90deg, transparent, ${color}, transparent)`,
+        opacity: 0.4
+      }}></div>
     </div>
   );
 
   return (
-    <div className="page" style={{ background: 'transparent' }}>
-      {/* Header Section */}
-      <div style={{ marginBottom: "32px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: "32px", color: "var(--text-main)", fontWeight: "900", letterSpacing: "-0.5px" }}>
-            {selectedProject ? selectedProject.name : "Global Dashboard"}
+    <div className="page" style={{ position: 'relative' }}>
+      <style>{`
+        .digital-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 25px 50px -12px ${stats.primaryColor || '#6366f1'}33 !important;
+            border-color: var(--primary-color) !important;
+        }
+        @keyframes pulse-glow {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(1.2); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
+
+      {/* Header HUD - SYSTEM STATUS BOARD */}
+      <div style={{ 
+        marginBottom: "40px", 
+        padding: "36px",
+        background: "var(--ui-surface)",
+        borderRadius: "26px",
+        border: "1px solid var(--ui-border)",
+        boxShadow: "0 15px 35px -5px rgba(0,0,0,0.05)",
+        display: "flex", 
+        justifyContent: "space-between", 
+        alignItems: "center",
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
+        {/* Futuristic Side Accents */}
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '6px', height: '100%', background: 'linear-gradient(to bottom, var(--primary-color), #4f46e5)' }}></div>
+        <div style={{ position: 'absolute', top: 0, right: 0, width: '100px', height: '100px', background: 'var(--primary-glow)', borderRadius: '50%', filter: 'blur(50px)', opacity: 0.3 }}></div>
+
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '10px' }}>
+            <div style={{ 
+                padding: '5px 12px', 
+                background: connected ? 'rgba(52, 211, 153, 0.1)' : 'rgba(239, 68, 68, 0.1)', 
+                borderRadius: '6px', 
+                border: connected ? '1px solid rgba(52, 211, 153, 0.3)' : '1px solid rgba(239, 68, 68, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+            }}>
+                <span style={{ 
+                    width: '6px', 
+                    height: '6px', 
+                    borderRadius: '50%', 
+                    background: connected ? '#10b981' : '#ef4444', 
+                    boxShadow: connected ? '0 0 10px #10b981' : '0 0 10px #ef4444',
+                    animation: connected ? 'pulse-glow 1.5s infinite' : 'none' 
+                }}></span>
+                <span style={{ fontSize: '10px', fontWeight: '950', color: connected ? '#059669' : '#b91c1c', letterSpacing: '1px' }}>
+                    {connected ? "SYNC ACTIVE" : "SYNC OFFLINE"}
+                </span>
+            </div>
+            <span style={{ color: 'var(--text-light)', fontSize: '10px', fontWeight: '800' }}>
+                LAST_REFRESH: {lastSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </span>
+          </div>
+          
+          <h1 style={{ margin: 0, fontSize: "42px", color: "var(--text-main)", fontWeight: "900", letterSpacing: "-1.5px", lineHeight: 1 }}>
+            {isSuperAdmin 
+              ? (selectedCompany ? selectedCompany.companyName : "Global Network")
+              : (user?.companyId?.companyName || (selectedProject ? selectedProject.name : "Command Center"))
+            }
           </h1>
-          <p style={{ margin: "8px 0 0 0", color: "var(--text-muted)", fontSize: "16px", fontWeight: "600" }}>
-            Welcome back, <strong style={{ color: "var(--primary-color)", fontWeight: "800" }}>{user?.name || "User"}</strong>! 🚀
+          <p style={{ margin: "16px 0 0 0", color: "var(--text-muted)", fontSize: "19px", fontWeight: "600", display: 'flex', alignItems: 'center', gap: '10px' }}>
+            Operational Access: <strong style={{ color: "var(--primary-color)", fontWeight: "900", borderBottom: '2px solid var(--primary-glow)' }}>{user?.name || "Authorized Personnel"}</strong>
           </p>
+        </div>
+
+        <div style={{ textAlign: 'right', paddingRight: '20px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '900', letterSpacing: '2px', marginBottom: '6px' }}>SYSTEM CHRONO</div>
+            <div style={{ fontSize: '26px', fontWeight: '950', color: "var(--text-main)", letterSpacing: '-1px' }}>
+                {new Date().toLocaleDateString(undefined, { month: 'short', day: '2-digit', year: 'numeric' }).toUpperCase()}
+            </div>
         </div>
       </div>
 
-      {/* Stats Grid */}
+      {/* NODE CLUSTER GRID */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-        gap: "24px",
-        marginBottom: "32px"
+        gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+        gap: "28px",
+        marginBottom: "46px"
       }}>
         {!selectedProject && (
           <StatCard
-            title="Total Projects"
+            title="ACTIVE INFRASTRUCTURE"
             value={stats.projectCount}
-            icon={
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            }
-            bgColor="linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)"
-            color="#4338ca"
+            icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7L12 12L22 7L12 2Z" /><path d="M2 17L12 22L22 17" /><path d="M2 12L12 17L22 12" /></svg>}
+            color="#6366f1"
+            delay={0.1}
           />
         )}
         <StatCard
-          title="Total Tasks"
+          title="EXECUTED PROTOCOLS"
           value={stats.taskCount}
-          icon={
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M9 11L12 14L22 4" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M21 12V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H16" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          }
-          bgColor="linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)"
-          color="#15803d"
+          icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11L12 14L22 4" /><path d="M21 12V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>}
+          color="#10b981"
+          delay={0.2}
         />
         <StatCard
-          title="Open Issues"
+          title="DEVIATION REPORTS"
           value={stats.issueCount}
-          icon={
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2.5" />
-              <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-              <circle cx="12" cy="16" r="1.5" fill="currentColor" />
-            </svg>
-          }
-          bgColor="linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)"
-          color="#b91c1c"
+          icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>}
+          color="#f43f5e"
+          delay={0.3}
         />
         <StatCard
-          title={selectedProject ? "Members" : "Total Staff"}
+          title="NETWORK ENTITIES"
           value={stats.staffCount}
-          icon={
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M17 21V19C17 17.9391 16.5786 16.9217 15.8284 16.1716C15.0783 15.4214 14.0609 15 13 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-              <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M23 21V19C22.9993 18.1137 22.7044 17.2522 22.1614 16.5523C21.6184 15.8524 20.8581 15.3516 20 15.13" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          }
-          bgColor="linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)"
-          color="#7e22ce"
+          icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21V19a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>}
+          color="#a855f7"
+          delay={0.4}
         />
       </div>
 
-      {/* User Info Card (Profile Quick View) */}
-      <div style={{
-        background: "var(--neu-bg)",
-        borderRadius: "24px",
-        padding: "32px",
-        boxShadow: "var(--neu-shadow-sm)",
-        border: "1px solid rgba(255,255,255,0.05)",
-        display: "inline-block",
-        minWidth: "400px"
-      }}>
-        <h3 style={{
-          margin: "0 0 24px 0",
-          color: "var(--text-main)",
-          fontSize: "20px",
-          fontWeight: "900",
-          borderBottom: "1px solid rgba(0,0,0,0.05)",
-          paddingBottom: "16px",
-          letterSpacing: "-0.3px",
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px'
-        }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-          Account Member
-        </h3>
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ color: "var(--text-light)", fontSize: "11px", fontWeight: "800", textTransform: 'uppercase', letterSpacing: '1px' }}>Full Name</span>
-            <span style={{ fontWeight: "800", color: "var(--text-main)", fontSize: "15px" }}>{user?.name || 'N/A'}</span>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '28px', marginBottom: '40px' }}>
+          {/* TASK DISTRIBUTION HUD */}
+          <div style={{
+            background: "var(--ui-surface)",
+            borderRadius: "28px",
+            padding: "32px",
+            boxShadow: "0 20px 40px -15px rgba(0,0,0,0.06)",
+            border: "1px solid var(--ui-border)",
+            display: 'flex',
+            alignItems: 'center',
+            gap: '30px'
+          }}>
+            <div style={{ position: 'relative', width: '120px', height: '120px' }}>
+                 <svg width="120" height="120" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r="54" fill="none" stroke="var(--ui-border)" strokeWidth="8" />
+                    <circle cx="60" cy="60" r="54" fill="none" stroke="var(--primary-color)" strokeWidth="10" 
+                        strokeDasharray="339.29" 
+                        strokeDashoffset={339.29 * (1 - (stats.completionRate / 100))}
+                        strokeLinecap="round"
+                        transform="rotate(-90 60 60)"
+                        style={{ filter: 'drop-shadow(0 0 5px var(--primary-color))', transition: 'stroke-dashoffset 1s ease-out' }}
+                    />
+                 </svg>
+                 <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
+                     <div style={{ fontSize: '24px', fontWeight: '950', color: 'var(--text-main)' }}>{stats.completionRate}%</div>
+                     <div style={{ fontSize: '9px', fontWeight: '800', color: 'var(--text-muted)' }}>COMPLETE</div>
+                 </div>
+            </div>
+            <div style={{ flex: 1 }}>
+                <h3 style={{ margin: '0 0 16px 0', fontSize: '13px', fontWeight: '950', letterSpacing: '2px', color: 'var(--text-main)' }}>PROTOCOL STATUS</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {[
+                        { label: 'PENDING', val: stats.distribution.pending, color: '#f59e0b' },
+                        { label: 'IN_PROGRESS', val: stats.distribution.inProgress, color: '#3b82f6' },
+                        { label: 'STABLE', val: stats.distribution.stable, color: '#10b981' }
+                    ].map((s, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: s.color }}></div>
+                            <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', flex: 1 }}>{s.label}</span>
+                            <span style={{ fontSize: '12px', fontWeight: '900', color: "var(--text-main)" }}>{s.val}%</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ color: "var(--text-light)", fontSize: "11px", fontWeight: "800", textTransform: 'uppercase', letterSpacing: '1px' }}>Email ID</span>
-            <span style={{ fontWeight: "700", color: "var(--text-muted)", fontSize: "14px" }}>{user?.email || 'N/A'}</span>
+
+          {/* RECENT SYSTEM LOGS */}
+          <div style={{
+            background: "var(--ui-surface)",
+            borderRadius: "28px",
+            padding: "32px",
+            boxShadow: "0 20px 40px -15px rgba(0,0,0,0.06)",
+            border: "1px solid var(--ui-border)",
+            height: '100%',
+            overflow: 'hidden'
+          }}>
+             <h3 style={{ margin: '0 0 20px 0', fontSize: '13px', fontWeight: '950', letterSpacing: '2px', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ color: 'var(--primary-color)' }}>[</span> LIVE_AUDIT_FEED <span style={{ color: 'var(--primary-color)' }}>]</span>
+             </h3>
+             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {recentLogs.length > 0 ? recentLogs.map((log, i) => (
+                    <div key={i} style={{ display: 'flex', gap: '16px', animation: `fadeUpIn 0.5s ease backwards ${i * 0.1}s` }}>
+                        <div style={{ width: '2px', background: 'var(--ui-border)', position: 'relative' }}>
+                            <div style={{ 
+                                position: 'absolute', top: '0', left: '-3px', width: '8px', height: '8px', borderRadius: '50%', 
+                                background: log.type === 'error' ? 'var(--error-color)' : 'var(--success-color)',
+                                boxShadow: `0 0 8px ${log.type === 'error' ? 'var(--error-color)' : 'var(--success-color)'}`
+                            }}></div>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '13px', fontWeight: '800', color: "var(--text-main)", letterSpacing: '-0.2px' }}>{log.msg}</div>
+                            <div style={{ fontSize: '10px', fontWeight: '950', color: 'var(--text-muted)', marginTop: '4px', letterSpacing: '0.5px' }}>{log.time.toUpperCase()}</div>
+                        </div>
+                    </div>
+                )) : (
+                    <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '12px', fontWeight: '800' }}>
+                        SYSTEM_IDLE_NODE...
+                    </div>
+                )}
+             </div>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ color: "var(--text-light)", fontSize: "11px", fontWeight: "800", textTransform: 'uppercase', letterSpacing: '1px' }}>Assigned Role</span>
-            <span style={{
-              fontWeight: "900",
-              color: "var(--primary-color)",
-              background: "rgba(37, 99, 235, 0.08)",
-              padding: "4px 12px",
-              borderRadius: "8px",
-              fontSize: "11px",
-              textTransform: "uppercase",
-              letterSpacing: '0.5px'
-            }}>
-              {(user.email === "gadanipranav@gmail.com" || user.role?.name === "Super Admin") ? "Super Admin" : user.role?.name || "User"}
-            </span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ color: "var(--text-light)", fontSize: "11px", fontWeight: "800", textTransform: 'uppercase', letterSpacing: '1px' }}>Status</span>
-            <span style={{
-              padding: "6px 14px",
-              fontSize: "11px",
-              fontWeight: "900",
-              background: "#dcfce7",
-              color: "#16a34a",
-              borderRadius: "20px",
-              textTransform: "uppercase",
-              letterSpacing: '0.5px'
-            }}>
-              ACTIVE
-            </span>
-          </div>
-        </div>
       </div>
 
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '28px' }}>
+          {/* DIGITAL ACTIVITY PULSE - CUSTOM SVG GRAPH */}
+          <div style={{
+            background: "var(--ui-surface)",
+            borderRadius: "28px",
+            padding: "32px",
+            boxShadow: "0 20px 40px -15px rgba(0,0,0,0.06)",
+            border: "1px solid var(--ui-border)",
+            position: 'relative',
+            overflow: 'hidden',
+             display: 'flex',
+            flexDirection: 'column'
+          }}>
+             <h3 style={{
+              margin: "0 0 24px 0",
+              color: "var(--text-main)",
+              fontSize: "13px",
+              fontWeight: "950",
+              textTransform: 'uppercase',
+              letterSpacing: '2px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--primary-color)' }}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
+              Activity Pulse Sync
+            </h3>
+
+            <div style={{ flex: 1, position: 'relative', minHeight: '180px' }}>
+                <svg width="100%" height="180" viewBox="0 0 400 180" preserveAspectRatio="none" style={{ overflow: 'visible' }}>
+                    {/* Background Grid */}
+                    {[0, 45, 90, 135, 180].map(y => (
+                        <line key={y} x1="0" y1={y} x2="400" y2={y} stroke="var(--ui-border)" strokeWidth="0.5" strokeDasharray="4 4" />
+                    ))}
+                    
+                    {/* The Pulse Line */}
+                    <path 
+                        d="M0,150 Q50,140 80,80 T160,110 T240,60 T320,130 T400,90" 
+                        fill="none" 
+                        stroke="var(--primary-color)" 
+                        strokeWidth="3" 
+                        strokeLinecap="round"
+                        style={{ filter: 'drop-shadow(0 0 8px var(--primary-color))' }}
+                    />
+                    
+                    {/* Under-glow area */}
+                    <path 
+                        d="M0,150 Q50,140 80,80 T160,110 T240,60 T320,130 T400,90 L400,180 L0,180 Z" 
+                        fill="url(#pulseGradient)" 
+                        opacity="0.1" 
+                    />
+
+                    <defs>
+                        <linearGradient id="pulseGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stopColor="var(--primary-color)" />
+                            <stop offset="100%" stopColor="transparent" />
+                        </linearGradient>
+                    </defs>
+
+                    {/* Data Nodes */}
+                    {[
+                        { x: 80, y: 80 }, { x: 160, y: 110 }, { x: 240, y: 60 }, { x: 320, y: 130 }
+                    ].map((pt, i) => (
+                        <circle key={i} cx={pt.x} cy={pt.y} r="4" fill="var(--ui-surface)" stroke="var(--primary-color)" strokeWidth="2" />
+                    ))}
+                </svg>
+
+                {/* Legend */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '16px' }}>
+                    {['06 AM', '10 AM', '02 PM', '06 PM', '10 PM'].map(time => (
+                        <span key={time} style={{ fontSize: '10px', color: 'var(--text-light)', fontWeight: '800' }}>{time}</span>
+                    ))}
+                </div>
+            </div>
+          </div>
+
+          {/* SECURE IDENTITY HUD */}
+          <div style={{
+            background: "var(--ui-surface)",
+            borderRadius: "28px",
+            padding: "40px",
+            boxShadow: "0 20px 40px -15px rgba(0,0,0,0.06)",
+            border: "1px solid var(--ui-border)",
+            position: 'relative',
+            overflow: 'hidden',
+            height: '100%'
+          }}>
+             {/* Cybernetic Grid Overlay Background */}
+             <div style={{ position: 'absolute', top: 0, right: 0, width: '120px', height: '120px', background: 'var(--primary-glow)', borderRadius: '50%', filter: 'blur(50px)', opacity: 0.4 }}></div>
+             
+             <h3 style={{
+              margin: "0 0 32px 0",
+              color: "var(--text-main)",
+              fontSize: "13px",
+              fontWeight: "950",
+              textTransform: 'uppercase',
+              letterSpacing: '3px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '14px'
+            }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary-color)', boxShadow: '0 0 12px var(--primary-color)', animation: 'pulse-glow 2s infinite' }}></span>
+              AUTHENTICATED IDENTITY
+            </h3>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+              {[
+                { label: 'NETWORK ENTITY', value: user?.name, icon: 'USER' },
+                { label: 'ENCRYPTION NODE', value: user?.email, icon: 'NODE' },
+                { label: 'SYSTEM CLUSTER', value: user?.companyId?.companyName || 'GLOBAL_ROOT', icon: 'UNIT' },
+              ].map((item, idx) => (
+                <div key={idx} style={{ 
+                    display: "flex", 
+                    justifyContent: "space-between", 
+                    alignItems: "center",
+                    padding: '16px 20px',
+                    background: 'var(--ui-bg)',
+                    borderRadius: '16px',
+                    border: '1px solid var(--ui-border)',
+                    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.02)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '9px', fontWeight: '950', color: 'var(--primary-color)', opacity: 0.7, background: 'var(--primary-glow)', padding: '4px 8px', borderRadius: '4px' }}>{item.icon}</span>
+                    <span style={{ color: "var(--text-muted)", fontSize: "11px", fontWeight: "800", textTransform: 'uppercase', letterSpacing: '0.5px' }}>{item.label}</span>
+                  </div>
+                  <span style={{ fontWeight: "900", color: "var(--text-main)", fontSize: "15px", letterSpacing: '-0.3px' }}>{item.value || 'REDACTED'}</span>
+                </div>
+              ))}
+              
+              <div style={{ 
+                display: "flex", 
+                justifyContent: "space-between", 
+                alignItems: "center",
+                padding: '16px 20px',
+                marginTop: '10px'
+              }}>
+                <span style={{ color: "var(--text-muted)", fontSize: "11px", fontWeight: "800", textTransform: 'uppercase', letterSpacing: '1.5px' }}>SECURITY STATUS</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ 
+                        background: 'var(--success-color)', 
+                        color: '#fff', 
+                        fontSize: '10px', 
+                        fontWeight: '950', 
+                        padding: '6px 14px', 
+                        borderRadius: '25px',
+                        boxShadow: '0 0 20px rgba(16, 185, 129, 0.4)',
+                        letterSpacing: '1px'
+                    }}>ROOT ACCESS</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* HUD Corner Accents */}
+            <div style={{ position: 'absolute', bottom: 0, left: 0, width: '20px', height: '20px', borderLeft: '2px solid var(--primary-glow)', borderBottom: '2px solid var(--primary-glow)' }}></div>
+            <div style={{ position: 'absolute', top: 0, right: 0, width: '20px', height: '20px', borderRight: '2px solid var(--primary-glow)', borderTop: '2px solid var(--primary-glow)' }}></div>
+          </div>
+      </div>
     </div>
   );
 }

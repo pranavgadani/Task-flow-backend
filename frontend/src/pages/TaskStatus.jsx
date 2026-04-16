@@ -7,53 +7,103 @@ import API from "../api/api";
 import { getStatusBadgeClass, formatStatusText } from "../utils/statusHelper";
 import { useProject } from "../contexts/ProjectContext";
 import { SelectField, TextInput } from "../components/common/FormFields";
+import { useAuth } from "../contexts/AuthContext";
+import { usePermissions } from "../contexts/PermissionContext";
+import { useCompany } from "../contexts/CompanyContext";
 
 export default function TaskStatus() {
   const { selectedProject } = useProject();
+  const { selectedCompany } = useCompany();
   const [statuses, setStatuses] = useState([]);
-  const [projects, setProjects] = useState([]);
+  const [toast, setToast] = useState(null);
   const [form, setForm] = useState({
     name: "",
-    status: "Active",
+    status: "",
     project: "",
   });
   const [editId, setEditId] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const { user } = useAuth();
+  const { hasPermission: ctxHasPermission } = usePermissions();
+
+  const isSuperAdmin = user?.email === "gadanipranav@gmail.com" || user?.role?.name === "Super Admin";
+  const isCompanyOwner = user?.role?.name === "Company Owner";
+
+  const hasPermission = (module, action = "read") => {
+    if (isSuperAdmin || isCompanyOwner) return true;
+    return ctxHasPermission(module, action);
+  };
+
+  // Toast notification
+  const showToast = (msg, type = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 1000);
+  };
 
   const fetchStatus = async () => {
-    const url = selectedProject ? `/task-status?project=${selectedProject._id}` : "/task-status";
+    const url = selectedProject
+      ? `/task-status?project=${selectedProject._id}`
+      : "/task-status";
     const res = await API.get(url);
     setStatuses(res.data);
   };
 
-  const fetchProjects = async () => {
-    const res = await API.get("/projects");
-    setProjects(res.data || []);
-  };
-
   useEffect(() => {
     fetchStatus();
-    fetchProjects();
-  }, [selectedProject]);
+  }, [selectedProject, selectedCompany]);
 
   const resetForm = () => {
-    setForm({ name: "", status: "Active", project: selectedProject?._id || "" });
+    setForm({ name: "", status: "", project: selectedProject?._id || "" });
     setEditId(null);
   };
 
   const handleSave = async () => {
-    if (editId) {
-      await API.put(
-        `/task-status/${editId}`,
-        form
-      );
-    } else {
-      await API.post("/task-status", form);
+    // Validation
+    if (!form.name.trim()) {
+      showToast("Status name is required", "error");
+      return;
+    }
+    if (!form.status) {
+      showToast("Please select a status", "error");
+      return;
     }
 
-    fetchStatus();
-    resetForm();
-    setShowModal(false);
+    try {
+      const payload = {
+        ...form,
+        project: form.project || selectedProject?._id || ""
+      };
+
+      if (editId) {
+        const originalStatus = statuses.find(s => s._id === editId);
+        if (originalStatus) {
+            const isSameName = originalStatus.name === form.name.trim();
+            const isSameStatus = originalStatus.status === form.status;
+            
+            if (isSameName && isSameStatus) {
+                showToast("No changes detected.", "info");
+                setShowModal(false);
+                resetForm();
+                return;
+            }
+        }
+        await API.put(
+          `/task-status/${editId}`,
+          payload
+        );
+        showToast("Task status updated successfully!");
+      } else {
+        await API.post("/task-status", payload);
+        showToast("Task status added successfully!");
+      }
+
+      fetchStatus();
+      resetForm();
+      setShowModal(false);
+    } catch (error) {
+      console.error("Error saving task status:", error);
+      showToast("Error saving task status", "error");
+    }
   };
 
   const handleAddClick = () => {
@@ -77,16 +127,28 @@ export default function TaskStatus() {
   };
 
   const handleDelete = async (id) => {
-    await API.delete(`/task-status/${id}`);
-    fetchStatus();
+    try {
+      await API.delete(`/task-status/${id}`);
+      showToast("Task status deleted successfully!", "delete");
+      fetchStatus();
+    } catch (error) {
+      console.error("Error deleting task status:", error);
+      showToast("Error deleting task status", "error");
+    }
   };
 
   return (
     <div className="page">
       <PageHeader
         title={selectedProject ? `${selectedProject.name} — Task Status` : "Task Status"}
-        buttonText="Add Status"
-        onButtonClick={handleAddClick}
+        buttonText={hasPermission("task_status_management", "create") ? "Add Status" : null}
+        onButtonClick={() => {
+          if (!selectedProject) {
+            showToast("Please select a specific project from the top menu to add a status", "error");
+            return;
+          }
+          handleAddClick();
+        }}
       />
 
       <FormModal
@@ -116,18 +178,9 @@ export default function TaskStatus() {
             value={form.status}
             onChange={(e) => setForm({ ...form, status: e.target.value })}
             options={[
+              { value: "", label: "Select Status" },
               { value: "Active", label: "Active" },
-              { value: "Inactive", label: "Delete" },
-            ]}
-          />
-
-          <SelectField
-            label="Link to Project"
-            value={form.project}
-            onChange={(e) => setForm({ ...form, project: e.target.value })}
-            options={[
-              { value: "", label: "No Project (Global)" },
-              ...projects.map(p => ({ value: p._id, label: p.name }))
+              { value: "Inactive", label: "Inactive" },
             ]}
           />
         </form>
@@ -142,38 +195,36 @@ export default function TaskStatus() {
               key: "status",
               header: "Status",
               render: (value) => (
-                <span style={{
-                  padding: "6px 14px",
-                  borderRadius: "20px",
-                  fontSize: "11px",
-                  fontWeight: "800",
-                  background: value === "Active" ? "#dcfce7" : "#fee2e2",
-                  color: value === "Active" ? "#16a34a" : "#dc2626",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.5px"
-                }}>
-                  {value === "Inactive" ? "Delete" : value}
+                <span className={`badge badge-${value?.toLowerCase()}`}>
+                  {value}
                 </span>
               ),
             },
-            {
-              key: "project",
-              header: "Project",
-              render: (p) => p ? (
-                <span style={{
-                  padding: "4px 10px", borderRadius: "8px", fontSize: "11px",
-                  fontWeight: "700", background: "var(--neu-bg)",
-                  boxShadow: "var(--neu-shadow-sm)", color: "var(--primary-color)"
-                }}>
-                  {p.name || "Project"}
-                </span>
-              ) : <span style={{ color: "#aaa" }}>Global</span>
-            },
           ]}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
+          onEdit={hasPermission("task_status_management", "update") ? handleEdit : null}
+          onDelete={hasPermission("task_status_management", "delete") ? handleDelete : null}
         />
       </div>
+
+      {/* TOAST */}
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          padding: '16px 24px',
+          borderRadius: '8px',
+          background: toast.type === 'success' ? '#4CAF50' : toast.type === 'delete' ? '#f44336' : toast.type === 'error' ? '#f44336' : '#ff9800',
+          color: 'white',
+          fontSize: '14px',
+          fontWeight: '600',
+          zIndex: 9999,
+          animation: 'slideInRight 0.3s ease-out',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+        }}>
+          {toast.msg}
+        </div>
+      )}
     </div>
   );
 }

@@ -16,7 +16,7 @@ const ProtectedRoute = ({ children, permissionValue, action = 'read', fallback =
     return children;
   }
 
-  return fallback || <div>Access Denied</div>;
+  return fallback || null;
 };
 
 export default ProtectedRoute;
