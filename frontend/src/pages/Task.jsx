@@ -111,42 +111,48 @@ export default function Task({ isIssue = false }) {
   // ================= LOAD =================
   const load = async () => {
     try {
-      const [t, st, p, s] = await Promise.all([
-        selectedProject
+      // 1. Fetch Tasks (Primary)
+      try {
+        const t = await (selectedProject
           ? API.get(`/tasks?project=${selectedProject._id}&type=${isIssue ? "issue" : "task"}&page=${serverPage}&limit=${serverPageSize}`)
-          : API.get(`/tasks?type=${isIssue ? "issue" : "task"}&page=${serverPage}&limit=${serverPageSize}`),
-        selectedProject
-          ? API.get(`/task-status?project=${selectedProject._id}`)
-          : API.get("/task-status"),
-        API.get("/projects"),
-        API.get("/staff"),
-      ]);
+          : API.get(`/tasks?type=${isIssue ? "issue" : "task"}&page=${serverPage}&limit=${serverPageSize}`));
+        
+        let rawTasks = [];
+        if (t.data && t.data.tasks) {
+          rawTasks = t.data.tasks;
+          setTotalRecords(t.data.totalCount || 0);
+        } else {
+          rawTasks = Array.isArray(t.data) ? t.data : [];
+          setTotalRecords(rawTasks.length);
+        }
+        const filteredTasks = isIssue
+          ? rawTasks.filter(task => task.type === "issue")
+          : rawTasks.filter(task => task.type === "task" || !task.type);
+        setTasks(filteredTasks);
+      } catch (err) { console.error("Error loading tasks:", err); }
 
-      // ✅ Double safety: also filter by type on client side
-      // Issue page: only show type="issue"
-      // Task page: show type="task" OR no type (old data)
-      let rawTasks = [];
-      if (t.data && typeof t.data === 'object' && !Array.isArray(t.data) && t.data.tasks) {
-        // Handle paginated response
-        rawTasks = t.data.tasks;
-        setTotalRecords(t.data.totalCount || 0);
-      } else {
-        // Handle unpaginated standard array response (safeguard)
-        rawTasks = Array.isArray(t.data) ? t.data : [];
-        setTotalRecords(rawTasks.length);
-      }
+      // 2. Fetch Statuses
+      try {
+        const st = await (selectedProject ? API.get(`/task-status?project=${selectedProject._id}`) : API.get("/task-status"));
+        setStatuses(st.data || []);
+      } catch (err) { console.error("Error loading statuses:", err); }
 
-      const filteredTasks = isIssue
-        ? rawTasks.filter(task => task.type === "issue")
-        : rawTasks.filter(task => task.type === "task" || !task.type);
+      // 3. Fetch Projects
+      try {
+        const p = await API.get("/projects");
+        setProjects(p.data || []);
+      } catch (err) { console.error("Error loading projects:", err); }
 
-      setTasks(filteredTasks);
-      setStatuses(st.data || []);
-      setProjects(p.data || []);
+      // 4. Fetch Staff (The critical part)
+      try {
+        const s = await API.get("/staff");
+        const staffData = s.data.staff || s.data || [];
+        console.log("DEBUG: Staff data list is ->", staffData);
+        setStaff(staffData);
+      } catch (err) { console.error("Error loading staff:", err); }
 
-      setStaff(s.data.staff || s.data || []);
     } catch (e) {
-      console.log(e);
+      console.error("General load error:", e);
     }
   };
 
