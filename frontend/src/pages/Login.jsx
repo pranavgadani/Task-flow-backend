@@ -50,6 +50,9 @@ export default function Login() {
         try {
             const res = await API.post("/auth/login", loginForm);
             const user = res.data.user;
+            const token = res.data.token;
+            if (token) localStorage.setItem("token", token);
+            
             setAuthUser(user);
             showToast("Login Successful!");
             navigate("/");

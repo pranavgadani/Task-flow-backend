@@ -21,6 +21,11 @@ const API = axios.create({
 // ⚡ Global Interceptor: Automatically attach selectedCompany to all outgoing requests
 API.interceptors.request.use((config) => {
   try {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
     const saved = localStorage.getItem("selectedCompany");
     if (saved) {
       const company = JSON.parse(saved);

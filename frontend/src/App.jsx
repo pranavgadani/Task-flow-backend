@@ -16,6 +16,7 @@ import Team from "./pages/Team";
 import Document from "./pages/Document";
 import ResetPassword from "./pages/ResetPassword";
 import CompanyRegister from "./pages/CompanyRegister";
+import ForgotPassword from "./pages/ForgotPassword";
 import CompanyList from "./pages/CompanyList";
 import Subscription from "./pages/Subscription";
 import Profile from "./pages/Profile";
@@ -26,10 +27,7 @@ import { CompanyProvider } from "./contexts/CompanyContext";
 
 // ============ Inner component (uses AuthContext + PermissionContext) ============
 function AppRoutes() {
-  // 🧹 Clean up old localStorage keys (no longer needed)
-  localStorage.removeItem("permissions");
-  localStorage.removeItem("token");
-  localStorage.removeItem("user");
+
 
   const { user, loading: authLoading } = useAuth();
   const { hasPermission: ctxHasPermission, loading: permissionLoading } = usePermissions();
@@ -62,6 +60,7 @@ function AppRoutes() {
       <Route path="/login" element={<Login />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/register-company" element={<CompanyRegister />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
 
       {/* PROTECTED ROUTES */}
       <Route

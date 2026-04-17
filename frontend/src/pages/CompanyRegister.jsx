@@ -86,7 +86,11 @@ export default function CompanyRegister() {
             const formData = new FormData();
             Object.keys(form).forEach(key => {
                 if (key !== 'confirmPassword') {
-                    formData.append(key, ['gstNumber', 'panNumber'].includes(key) && form[key] ? form[key].toUpperCase() : form[key]);
+                    let val = form[key];
+                    if (key === 'contactPersonEmail' && !val) {
+                        val = form.email;
+                    }
+                    formData.append(key, ['gstNumber', 'panNumber'].includes(key) && val ? val.toUpperCase() : val);
                 }
             });
             if (logo) formData.append("appLogo", logo);
@@ -94,6 +98,7 @@ export default function CompanyRegister() {
             const res = await API.post("/companies/register", formData, {
                 headers: { "Content-Type": "multipart/form-data" }
             });
+            if (res.data.token) localStorage.setItem("token", res.data.token);
             if (res.data.staff) login(res.data.staff);
             showToast("Registration Successful!");
             navigate("/profile?tab=subscription&new=1");
