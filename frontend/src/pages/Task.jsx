@@ -144,7 +144,7 @@ export default function Task({ isIssue = false }) {
       setStatuses(st.data || []);
       setProjects(p.data || []);
 
-      setStaff(s.data || []);
+      setStaff(s.data.staff || s.data || []);
     } catch (e) {
       console.log(e);
     }
@@ -491,7 +491,7 @@ export default function Task({ isIssue = false }) {
 
   // ================= HELPER: filter valid staff (Staff + Manager roles) =================
   const getValidStaff = () => {
-    return staff;
+    return Array.isArray(staff) ? staff : (staff.staff || []);
   };
 
   // ================= PRIORITY COLOR =================
@@ -1032,7 +1032,7 @@ export default function Task({ isIssue = false }) {
 
             {/* Dropdown List */}
             {isDropdownOpen && (
-              <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 1000, background: "#ffffff", borderRadius: "12px", maxHeight: "180px", overflowY: "auto", boxShadow: "0 10px 25px rgba(0,0,0,0.15)", marginTop: "8px", border: "1px solid var(--ui-border)", padding: "4px" }}>
+              <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 9999, background: "#ffffff", borderRadius: "12px", maxHeight: "250px", overflowY: "auto", boxShadow: "0 10px 25px rgba(0,0,0,0.15)", marginTop: "8px", border: "1px solid var(--ui-border)", padding: "4px" }}>
                 {getValidStaff()
                   .filter(s => s.name?.toLowerCase().includes(memberSearch.toLowerCase())).length > 0 ? (
                     getValidStaff()
