@@ -8,12 +8,21 @@ const getCompanyId = (req) => {
   const isSuperAdmin =
     req.user?.email === "gadanipranav@gmail.com" ||
     req.user?.role?.name === "Super Admin";
-  const c =
+  let c =
     req.query.companyId ||
     req.body.companyId ||
     req.user?.companyId?._id?.toString() ||
     req.user?.companyId?.toString();
-  return isSuperAdmin && req.query.companyId ? req.query.companyId : c;
+  
+  if (isSuperAdmin && req.query.companyId) {
+    c = req.query.companyId;
+  }
+  
+  if (c === "undefined" || c === "null" || c === "") {
+    return undefined;
+  }
+  
+  return c;
 };
 
 const isOwnerOrAdmin = (req) => {

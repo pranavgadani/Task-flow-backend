@@ -6,8 +6,11 @@ const Message = require("../models/Message");
 const Staff = require("../models/Staff");
 
 // ─── Helper: get companyId ───────────────────────────────────────────────────
-const getCompanyId = (req) =>
-  req.query.companyId || req.body.companyId || req.user?.companyId?._id?.toString();
+const getCompanyId = (req) => {
+  const c = req.query.companyId || req.body.companyId || req.user?.companyId?._id?.toString();
+  if (c === "undefined" || c === "null" || c === "") return undefined;
+  return c;
+};
 
 // ═══════════════════════════════════════════
 //  CONVERSATIONS
