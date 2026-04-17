@@ -8,15 +8,13 @@ const getCompanyId = (req) => {
   const isSuperAdmin =
     req.user?.email === "gadanipranav@gmail.com" ||
     req.user?.role?.name === "Super Admin";
+  
+  // Use explicit body/query ID first (for superadmins), but fallback to user's own companyId
   let c =
-    req.query.companyId ||
     req.body.companyId ||
+    req.query.companyId ||
     req.user?.companyId?._id?.toString() ||
     req.user?.companyId?.toString();
-  
-  if (isSuperAdmin && req.query.companyId) {
-    c = req.query.companyId;
-  }
   
   if (c === "undefined" || c === "null" || c === "") {
     return undefined;

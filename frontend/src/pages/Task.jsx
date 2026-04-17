@@ -945,8 +945,9 @@ export default function Task({ isIssue = false }) {
         title={editId ? (isIssue ? "Edit Issue" : "Edit Task") : (isIssue ? "Add Issue" : "Add Task")}
         onSave={save}
         loading={loading}
+        maxWidth="850px"
       >
-        <div style={{ maxHeight: '65vh', overflowY: 'auto', overflowX: 'visible', padding: '10px 5px 200px 5px' }}>
+        <div style={{ maxHeight: '70vh', overflowY: 'auto', overflowX: 'visible', padding: '10px 10px 40px 10px' }}>
           <div style={{ marginBottom: "20px" }}>
 
           <label style={{ fontWeight: "700", display: "block", marginBottom: "8px", fontSize: "14px", color: "var(--text-main)" }}>Title <span style={{ color: "red" }}>*</span></label>
@@ -1089,16 +1090,27 @@ export default function Task({ isIssue = false }) {
                           setForm({ ...form, assignedTo: currentSelected });
                         }}
                         style={{
-                          padding: "10px 15px", cursor: "pointer", display: "flex",
-                          alignItems: "center", justifyContent: "space-between",
-                          background: isSelected ? "#f8fafc" : "transparent"
+                          padding: "12px 15px",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          background: isSelected ? "#f0f7ff" : "transparent",
+                          transition: "all 0.2s ease"
                         }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = "#f8fafc"}
+                        onMouseLeave={(e) => e.currentTarget.style.background = isSelected ? "#f0f7ff" : "transparent"}
                       >
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                          <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: "var(--primary-color)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: "800" }}>{s.name?.charAt(0).toUpperCase()}</div>
-                          <div style={{ fontSize: "14px", fontWeight: "600" }}>{s.name}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "var(--primary-color)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "800", boxShadow: "0 2px 4px rgba(0,0,0,0.1)" }}>
+                            {s.name?.charAt(0).toUpperCase()}
+                          </div>
+                          <div style={{ display: "flex", flexDirection: "column" }}>
+                            <div style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b" }}>{s.name}</div>
+                            <div style={{ fontSize: "11px", color: "#64748b" }}>{s.role?.name || "Staff Member"}</div>
+                          </div>
                         </div>
-                        {isSelected && <span style={{ color: "var(--primary-color)" }}>✔</span>}
+                        {isSelected && <span style={{ color: "var(--primary-color)", fontWeight: "bold", fontSize: "16px" }}>✔</span>}
                       </div>
                     );
                   })}

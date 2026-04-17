@@ -90,7 +90,7 @@ export default function Client() {
         await API.put(`/clients/${editId}`, form);
         showToast("Client updated successfully!");
       } else {
-        await API.post("/clients", form);.0
+        await API.post("/clients", form);
         showToast("Client added successfully!");
       }
       resetForm();
