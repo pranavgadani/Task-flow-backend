@@ -144,15 +144,7 @@ export default function Task({ isIssue = false }) {
       setStatuses(st.data || []);
       setProjects(p.data || []);
 
-      // Filter staff based on selected project's 'assignedTo' list (if a project is selected)
-      const allStaff = s.data || [];
-      if (selectedProject && selectedProject.assignedTo && selectedProject.assignedTo.length > 0) {
-        const assignedIds = selectedProject.assignedTo.map(u => u._id || u);
-        // Show only staff/managers who are assigned to this project
-        setStaff(allStaff.filter(user => assignedIds.includes(user._id)));
-      } else {
-        setStaff(allStaff);
-      }
+      setStaff(s.data || []);
     } catch (e) {
       console.log(e);
     }
