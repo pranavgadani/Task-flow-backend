@@ -103,13 +103,8 @@ io.on("connection", (socket) => {
 
 // middleware
 app.use(cors({
-  origin: function(origin, callback) {
-    if (!origin || origin.startsWith("http://localhost:") || origin.endsWith(".vercel.app") || origin.includes("devtunnels.ms")) {
-      return callback(null, true);
-    }
-    return callback(null, false);
-  },
-  credentials: true,               // Allow cookies
+  origin: true, // Allow any origin that makes the request
+  credentials: true,
 }));
 app.use(cookieParser());
 app.use(express.json());
