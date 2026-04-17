@@ -140,7 +140,7 @@ app.get("/", (req, res) => {
 
 // MongoDB connect
 mongoose
-  .connect(process.env.MONGO_URI || "mongodb://127.0.0.1:27017/taskmanager")
+  .connect(process.env.MONGO_URI || process.env.MONGO_URL || "mongodb://127.0.0.1:27017/taskmanager")
   .then(async () => {
     console.log("✅ MongoDB Connected");
     await seedDefaults();
