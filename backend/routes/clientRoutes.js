@@ -3,100 +3,100 @@ const router = express.Router();
 const Client = require("../models/Client");
 const authMiddleware = require("../middleware/auth");
 
-// ─── Helper: Get Company ID ───────────────────────────────────────────────
+// ─── Resolve Company ID ───────────────────────────────────────
 const getCompanyId = (req) => {
-  return (
-    req.body.companyId ||
-    req.query.companyId ||
-    req.user?.companyId?._id?.toString() ||
-    req.user?.companyId?.toString()
-  );
+  const id = req.body.companyId || req.query.companyId || req.user?.companyId?._id || req.user?.companyId;
+  return id ? id.toString() : null;
 };
 
-// ─── Helper: Check Permissions ─────────────────────────────────────────────
-const isOwnerOrAdmin = (req) => {
-  const isSuperAdmin =
-    req.user?.email === "gadanipranav@gmail.com" ||
-    req.user?.role?.name === "Super Admin";
-  return isSuperAdmin || req.user?.role?.name === "Company Owner";
-};
-
-// ─── GET ALL ────────────────────────────────────────────────────────────────
+// ─── GET ALL ──────────────────────────────────────────────────
 router.get("/", authMiddleware, async (req, res) => {
   try {
-    const isSuperAdmin = req.user?.email === "gadanipranav@gmail.com" || req.user?.role?.name === "Super Admin";
     const cid = getCompanyId(req);
+    const isSuperAdmin = req.user?.email === "gadanipranav@gmail.com" || req.user?.role?.name === "Super Admin";
+
     const filter = {};
     if (cid) {
       filter.companyId = cid;
     } else if (!isSuperAdmin) {
+      console.warn("⚠️ No companyId for regular user:", req.user?._id);
       return res.json([]);
     }
-    const clients = await Client.find(filter)
-      .sort({ createdAt: -1 })
-      .populate("projects", "name");
+
+    const clients = await Client.find(filter).sort({ createdAt: -1 }).populate("projects", "name");
     res.json(clients);
   } catch (err) {
     console.error("❌ GET Clients Error:", err);
-    res.status(500).json({ message: "Error fetching clients" });
+    res.status(500).json({ error: "Server error", message: err.message });
   }
 });
 
-// ─── CREATE ─────────────────────────────────────────────────────────────────
+// ─── CREATE ───────────────────────────────────────────────────
 router.post("/", authMiddleware, async (req, res) => {
   try {
-    const { name, email } = req.body;
+    const { name, email, projects } = req.body;
+    
+    // Safety check for user
+    if (!req.user) return res.status(401).json({ message: "Not authenticated" });
+
+    // Validate inputs
     if (!name || !email) return res.status(400).json({ message: "Name and Email are required" });
-    if (!isOwnerOrAdmin(req)) return res.status(403).json({ message: "Access denied" });
 
+    // Resolve Company
     const companyId = getCompanyId(req);
-    if (!companyId) return res.status(400).json({ message: "Company profile not found. Please re-login." });
+    if (!companyId) return res.status(400).json({ message: "Company context missing. Please re-login." });
 
+    // Deduplication
     const cleanEmail = email.toLowerCase().trim();
     const exists = await Client.findOne({ email: cleanEmail, companyId });
-    if (exists) return res.status(400).json({ message: "Client with this email already exists" });
+    if (exists) return res.status(400).json({ message: "Client already exists" });
 
-    const client = await Client.create({
+    // Map projects properly (clean empty strings if any)
+    const projectList = Array.isArray(projects) ? projects.filter(p => p && p.length === 24) : [];
+
+    const newClient = new Client({
       ...req.body,
       email: cleanEmail,
-      companyId,
-      createdBy: req.user._id
+      companyId: companyId,
+      createdBy: req.user._id,
+      projects: projectList
     });
-    const populated = await client.populate("projects", "name");
+
+    await newClient.save();
+    const populated = await newClient.populate("projects", "name");
     res.status(201).json(populated);
+
   } catch (err) {
-    console.error("❌ CREATE Client Error:", err);
-    res.status(500).json({ message: err.message });
+    console.error("❌ POST Client Error:", err);
+    res.status(500).json({ error: "Server error", message: err.message });
   }
 });
 
-// ─── UPDATE ─────────────────────────────────────────────────────────────────
+// ─── UPDATE ───────────────────────────────────────────────────
 router.put("/:id", authMiddleware, async (req, res) => {
   try {
-    if (!isOwnerOrAdmin(req)) return res.status(403).json({ message: "Access denied" });
     const companyId = getCompanyId(req);
-    const client = await Client.findOneAndUpdate(
+    const updated = await Client.findOneAndUpdate(
       { _id: req.params.id, companyId },
       req.body,
       { new: true, runValidators: true }
-    ).populate("projects", "name");
-    if (!client) return res.status(404).json({ message: "Client not found" });
-    res.json(client);
+    );
+    if (!updated) return res.status(404).json({ message: "Client not found" });
+    res.json(updated);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
-// ─── DELETE ─────────────────────────────────────────────────────────────────
+// ─── DELETE ───────────────────────────────────────────────────
 router.delete("/:id", authMiddleware, async (req, res) => {
   try {
-    if (!isOwnerOrAdmin(req)) return res.status(403).json({ message: "Access denied" });
     const companyId = getCompanyId(req);
-    const client = await Client.findOneAndDelete({ _id: req.params.id, companyId });
-    if (!client) return res.status(404).json({ message: "Client not found" });
-    res.json({ message: "Deleted" });
+    const deleted = await Client.findOneAndDelete({ _id: req.params.id, companyId });
+    if (!deleted) return res.status(404).json({ message: "Client not found" });
+    res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
