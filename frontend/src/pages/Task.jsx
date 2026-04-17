@@ -1008,8 +1008,9 @@ export default function Task({ isIssue = false }) {
                  placeholder={form.assignedTo ? "Change staff member..." : "Choose a staff member..."}
                  value={memberSearch}
                  onFocus={() => setIsDropdownOpen(true)}
+                 onClick={() => setIsDropdownOpen(true)}
                  onChange={(e) => setMemberSearch(e.target.value)}
-                 style={{ paddingLeft: '48px', height: '48px', boxShadow: 'var(--shadow-sm)' }}
+                 style={{ paddingLeft: '48px', height: '48px', boxShadow: 'var(--shadow-sm)', cursor: 'text' }}
                />
             </div>
 

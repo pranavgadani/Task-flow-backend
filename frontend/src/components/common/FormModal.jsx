@@ -30,7 +30,7 @@ export default function FormModal({
           <h3>{title}</h3>
         </div>
 
-        <div className="modal-body">
+        <div className="modal-body" style={{ overflow: 'visible' }}>
           {children}
         </div>
 
