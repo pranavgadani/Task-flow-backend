@@ -1031,19 +1031,28 @@ export default function Task({ isIssue = false }) {
 
             {/* Dropdown List */}
             {isDropdownOpen && (
-              <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 100, background: "#ffffff", borderRadius: "12px", maxHeight: "180px", overflowY: "auto", boxShadow: "var(--shadow-lg)", marginTop: "8px", border: "1px solid var(--ui-border)", padding: "4px" }}>
+              <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 1000, background: "#ffffff", borderRadius: "12px", maxHeight: "180px", overflowY: "auto", boxShadow: "0 10px 25px rgba(0,0,0,0.15)", marginTop: "8px", border: "1px solid var(--ui-border)", padding: "4px" }}>
                 {getValidStaff()
-                  .filter(s => s.name?.toLowerCase().includes(memberSearch.toLowerCase()))
-                  .map(s => (
-                      <div
-                        key={s._id}
-                        onClick={() => { setForm({ ...form, assignedTo: s._id }); setMemberSearch(""); setIsDropdownOpen(false); }}
-                        style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 12px", cursor: "pointer", borderRadius: "8px", background: form.assignedTo === s._id ? "var(--primary-light)" : "transparent" }}
-                      >
-                         <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: "800" }}>{s.name?.charAt(0).toUpperCase()}</div>
-                         <div style={{ fontWeight: "600", fontSize: "14px" }}>{s.name}</div>
-                      </div>
-                  ))}
+                  .filter(s => s.name?.toLowerCase().includes(memberSearch.toLowerCase())).length > 0 ? (
+                    getValidStaff()
+                      .filter(s => s.name?.toLowerCase().includes(memberSearch.toLowerCase()))
+                      .map(s => (
+                          <div
+                            key={s._id}
+                            onClick={() => { setForm({ ...form, assignedTo: s._id }); setMemberSearch(""); setIsDropdownOpen(false); }}
+                            style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 12px", cursor: "pointer", borderRadius: "8px", background: form.assignedTo === s._id ? "var(--primary-light)" : "transparent" }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = "var(--primary-light)"}
+                            onMouseLeave={(e) => e.currentTarget.style.background = form.assignedTo === s._id ? "var(--primary-light)" : "transparent"}
+                          >
+                             <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: "var(--primary-color)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: "800" }}>{s.name?.charAt(0).toUpperCase()}</div>
+                             <div style={{ fontWeight: "600", fontSize: "14px", color: "var(--text-main)" }}>{s.name}</div>
+                          </div>
+                      ))
+                  ) : (
+                    <div style={{ padding: "12px", textAlign: "center", color: "var(--text-muted)", fontSize: "13px" }}>
+                       {staff.length === 0 ? "Loading users..." : "No members found"}
+                    </div>
+                  )}
               </div>
             )}
           </div>
