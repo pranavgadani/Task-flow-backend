@@ -13,7 +13,7 @@ const companyController = require("../controllers/companyController");
 const upload = require("../middleware/upload");
 
 // GET all staff
-router.get("/", authMiddleware, checkPermission("staff_management", "read"), async (req, res) => {
+router.get("/", authMiddleware, async (req, res) => {
   try {
     const isSuperAdmin = req.user.email === "gadanipranav@gmail.com" || req.user.role?.name === "Super Admin";
     const companyId = req.user.companyId?._id || req.user.companyId;

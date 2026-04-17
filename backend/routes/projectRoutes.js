@@ -7,7 +7,7 @@ const authMiddleware = require("../middleware/auth");
 const { checkPlanLimit } = require("../middleware/subscriptionLimits");
 
 // GET ALL
-router.get("/", authMiddleware, checkPermission("project_management", "read"), projectController.getProjects);
+router.get("/", authMiddleware, projectController.getProjects);
 
 // GET SINGLE
 router.get("/:id", authMiddleware, checkPermission("project_management", "read"), projectController.getProject);

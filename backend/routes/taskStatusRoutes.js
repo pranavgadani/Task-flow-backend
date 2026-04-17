@@ -6,7 +6,7 @@ const { checkPermission } = require("../middleware/permissions");
 const taskStatusController = require("../controllers/taskStatusController");
 
 // GET all statuses
-router.get("/", authMiddleware, checkPermission("task_status_management", "read"), taskStatusController.getAll);
+router.get("/", authMiddleware, taskStatusController.getAll);
 
 // CREATE status
 router.post("/", authMiddleware, checkPermission("task_status_management", "create"), taskStatusController.create);
