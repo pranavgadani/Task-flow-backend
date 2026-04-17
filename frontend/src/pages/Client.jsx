@@ -202,8 +202,9 @@ export default function Client() {
         title={editId ? "Edit Client" : "Add Client"}
         onSave={save}
         saveText={editId ? "Update" : "Save"}
+        maxWidth="800px"
       >
-        <form onSubmit={(e) => { e.preventDefault(); save(); }}>
+        <div style={{ maxHeight: '70vh', overflowY: 'auto', padding: '10px 10px 30px 10px' }}>
           <TextInput
             label="Full Name *"
             type="text"
@@ -325,7 +326,7 @@ export default function Client() {
               }}
             />
           </div>
-        </form>
+        </div>
       </FormModal>
 
       {/* ── VIEW DETAIL MODAL ── */}

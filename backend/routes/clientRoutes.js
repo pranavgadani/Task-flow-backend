@@ -33,13 +33,28 @@ const isOwnerOrAdmin = (req) => {
 // ─── GET ALL ────────────────────────────────────────────────────────────────
 router.get("/", authMiddleware, async (req, res) => {
   try {
+    const isSuperAdmin =
+      req.user?.email === "gadanipranav@gmail.com" ||
+      req.user?.role?.name === "Super Admin";
+
     const companyId = getCompanyId(req);
-    const clients = await Client.find({ companyId })
+    const filter = {};
+    
+    // Only apply company filter if not superadmin OR if specific company is requested
+    if (companyId) {
+      filter.companyId = companyId;
+    } else if (!isSuperAdmin) {
+      // Regular user without companyId? Should not happen if auth works, but return empty to be safe
+      return res.json([]);
+    }
+
+    const clients = await Client.find(filter)
       .sort({ createdAt: -1 })
       .populate("projects", "name")
       .populate("createdBy", "name");
     res.json(clients);
   } catch (err) {
+    console.error("GET Clients Error:", err);
     res.status(500).json({ message: err.message });
   }
 });
