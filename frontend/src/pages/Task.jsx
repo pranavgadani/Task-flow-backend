@@ -502,8 +502,8 @@ export default function Task({ isIssue = false }) {
     return staff.filter(s => {
       const pos = (s.position || "").toLowerCase();
       const roleName = (s.role?.name || "").toLowerCase();
-      return pos.includes("staff") || pos.includes("manager") ||
-        roleName.includes("staff") || roleName.includes("manager");
+      return pos.includes("staff") || pos.includes("manager") || pos.includes("owner") || pos.includes("admin") ||
+        roleName.includes("staff") || roleName.includes("manager") || roleName.includes("owner") || roleName.includes("admin");
     });
   };
 
