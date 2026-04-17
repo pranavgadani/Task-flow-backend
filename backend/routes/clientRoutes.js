@@ -23,7 +23,9 @@ router.get("/", authMiddleware, async (req, res) => {
       return res.json([]);
     }
 
-    const clients = await Client.find(query).sort({ createdAt: -1 });
+    const clients = await Client.find(query)
+      .sort({ createdAt: -1 })
+      .populate("projects", "name");
     res.json(clients);
   } catch (err) {
     console.error("❌ CLIENT_GET_ERROR:", err);

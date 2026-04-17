@@ -432,7 +432,10 @@ export default function Client() {
 
       {/* ── DATA TABLE ── */}
       <DataTable
-        data={clients}
+        data={selectedProject 
+          ? clients.filter(c => (c.projects || []).some(p => (p._id || p) === selectedProject._id))
+          : clients
+        }
         columns={columns}
         onEdit={isOwner ? edit : null}
         onDelete={isOwner ? remove : null}
