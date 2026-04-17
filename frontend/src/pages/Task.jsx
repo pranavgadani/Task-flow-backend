@@ -998,9 +998,9 @@ export default function Task({ isIssue = false }) {
         <div className="form-group">
           <label>Assign Staff <span style={{ color: "red" }}>*</span></label>
           <div style={{ position: 'relative' }} ref={dropdownRef}>
-            <div style={{ position: "relative" }}>
-               <span style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", color: "#9ca3af" }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" x2="16.65" y1="21" y2="16.65" /></svg>
+            <div style={{ position: "relative", marginBottom: "8px" }}>
+               <span style={{ position: "absolute", left: "16px", top: "50%", transform: "translateY(-50%)", color: "#94a3b8", display: "flex", alignItems: "center" }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" x2="16.65" y1="21" y2="16.65" /></svg>
                </span>
                <input
                  type="text"
@@ -1009,7 +1009,7 @@ export default function Task({ isIssue = false }) {
                  value={memberSearch}
                  onFocus={() => setIsDropdownOpen(true)}
                  onChange={(e) => setMemberSearch(e.target.value)}
-                 style={{ paddingLeft: '42px' }}
+                 style={{ paddingLeft: '48px', height: '48px', boxShadow: 'var(--shadow-sm)' }}
                />
             </div>
 
