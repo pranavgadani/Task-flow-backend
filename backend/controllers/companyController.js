@@ -106,10 +106,22 @@ exports.registerCompany = async (req, res) => {
 
     const populatedStaff = await Staff.findById(staff._id).populate("role").populate("companyId");
     const token = jwt.sign({ id: staff._id }, process.env.JWT_SECRET || "tasksecret", { expiresIn: "7d" });
-    res.cookie("token", token, { httpOnly: true, sameSite: "lax", maxAge: 7 * 24 * 60 * 60 * 1000 });
-
-    res.status(201).json({ message: "Company and Owner registered successfully", company, staff: populatedStaff, autoLogin: true });
+    res.cookie("token", token, { 
+      httpOnly: true, 
+      secure: true, 
+      sameSite: "none", 
+      maxAge: 7 * 24 * 60 * 60 * 1000 
+    });
+    
+    res.status(201).json({ 
+      message: "Company and Owner registered successfully", 
+      company, 
+      staff: populatedStaff, 
+      token,
+      autoLogin: true 
+    });
   } catch (err) {
+    console.error("REGISTER ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 };
