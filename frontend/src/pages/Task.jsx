@@ -499,12 +499,7 @@ export default function Task({ isIssue = false }) {
 
   // ================= HELPER: filter valid staff (Staff + Manager roles) =================
   const getValidStaff = () => {
-    return staff.filter(s => {
-      const pos = (s.position || "").toLowerCase();
-      const roleName = (s.role?.name || "").toLowerCase();
-      return pos.includes("staff") || pos.includes("manager") || pos.includes("owner") || pos.includes("admin") ||
-        roleName.includes("staff") || roleName.includes("manager") || roleName.includes("owner") || roleName.includes("admin");
-    });
+    return staff;
   };
 
   // ================= PRIORITY COLOR =================
