@@ -5,7 +5,7 @@ const SocketContext = createContext(null);
 
 const SOCKET_URL = window.location.hostname === "localhost"
     ? "http://localhost:5000"
-    : "https://mzdhklfk-5000.inc1.devtunnels.ms";
+    : "https://task-flow-backend-jiwe.onrender.com";
 
 export function SocketProvider({ children }) {
     const socketRef = useRef(null);

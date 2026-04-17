@@ -9,8 +9,8 @@ const getBaseURL = () => {
     const tunnelOrigin = window.location.origin.replace("-5173", "-5000");
     return `${tunnelOrigin}/api`;
   }
-  
-  return `${window.location.origin}/api`;
+  // Change this to your deployed Render URL
+  return `https://task-flow-backend-jiwe.onrender.com/api`;
 };
 
 const API = axios.create({
