@@ -103,7 +103,12 @@ io.on("connection", (socket) => {
 
 // middleware
 app.use(cors({
-  origin: ["http://localhost:5173", "https://mzdhklfk-5173.inc1.devtunnels.ms"], // Frontend URLs
+  origin: function(origin, callback) {
+    if (!origin || origin.startsWith("http://localhost:") || origin.endsWith(".vercel.app") || origin.includes("devtunnels.ms")) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
   credentials: true,               // Allow cookies
 }));
 app.use(cookieParser());
