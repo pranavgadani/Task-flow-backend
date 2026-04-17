@@ -15,21 +15,29 @@ const upload = require("../middleware/upload");
 // GET all staff
 router.get("/", authMiddleware, checkPermission("staff_management", "read"), async (req, res) => {
   try {
-    let query = {};
     const isSuperAdmin = req.user.email === "gadanipranav@gmail.com" || req.user.role?.name === "Super Admin";
-
     const companyId = req.user.companyId?._id || req.user.companyId;
+    let query = {};
+
+    // Safety: check for "undefined" string or empty string
+    const cleanCompanyId = (companyId && companyId !== "undefined" && companyId !== "") ? companyId : null;
 
     // If not superadmin, only show staff from the same company
-    if (!isSuperAdmin && companyId) {
-      query.companyId = companyId;
-    } else if (isSuperAdmin && req.query.companyId) {
+    if (!isSuperAdmin && cleanCompanyId) {
+      query.companyId = cleanCompanyId;
+    } else if (isSuperAdmin && req.query.companyId && req.query.companyId !== "undefined") {
       query.companyId = req.query.companyId;
-    } else if (!isSuperAdmin && !companyId) {
+    } else if (!isSuperAdmin && !cleanCompanyId) {
       query._id = req.user._id;
     }
 
-    const data = await Staff.find(query).populate("role", "name");
+    let data = await Staff.find(query).populate("role", "name");
+    
+    // Fallback: If list is empty and user is not superadmin, add current user
+    if (!isSuperAdmin && data.length === 0) {
+      data = [req.user];
+    }
+    
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
