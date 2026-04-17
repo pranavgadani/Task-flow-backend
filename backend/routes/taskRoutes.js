@@ -214,20 +214,21 @@ router.post(
         .populate("project", "name");
 
       // ===== SEND MAIL =====
-      if (populated.assignedTo?.email) {
-        try {
-          sendTaskOrIssueMail(
-            populated.assignedTo.email,
-            title,
-            description,
-            populated.assignedTo.name,
-            populated.status?.name,
-            populated.type || "task"
-          );
-          console.log(`${populated.type || "task"} assignment email sent to:`, populated.assignedTo.email);
-        } catch (emailError) {
-          console.error("Failed to send assignment email:", emailError);
-        }
+      if (Array.isArray(populated.assignedTo)) {
+        populated.assignedTo.forEach(staff => {
+          if (staff.email) {
+            try {
+              sendTaskOrIssueMail(
+                staff.email,
+                title,
+                description,
+                staff.name,
+                populated.status?.name,
+                populated.type || "task"
+              );
+            } catch (err) { console.error("Mail error:", err); }
+          }
+        });
       }
 
       // Socket emit
@@ -323,25 +324,22 @@ router.put("/:id", authMiddleware, checkAnyPermission(["task_management", "issue
       .populate("project", "name");
 
     // ===== SEND MAIL ON EDIT =====
-    const oldAssigneeId = originalTask.assignedTo?.toString();
-    const newAssigneeId = task.assignedTo?._id?.toString() || task.assignedTo?.toString();
-
-    if (task.assignedTo?.email) {
-      try {
-        const mode = (newAssigneeId && newAssigneeId !== oldAssigneeId) ? "assigned" : "updated";
-        sendTaskOrIssueMail(
-          task.assignedTo.email,
-          task.title,
-          task.description || "No description",
-          task.assignedTo.name,
-          task.status?.name || "Pending",
-          task.type || "task",
-          mode
-        );
-        console.log(`${task.type || "task"} ${mode} email sent to:`, task.assignedTo.email);
-      } catch (emailError) {
-        console.error("Failed to send update email:", emailError);
-      }
+    if (Array.isArray(task.assignedTo)) {
+      task.assignedTo.forEach(staff => {
+        if (staff.email) {
+          try {
+            sendTaskOrIssueMail(
+              staff.email,
+              task.title,
+              task.description || "No description",
+              staff.name,
+              task.status?.name || "Pending",
+              task.type || "task",
+              "updated"
+            );
+          } catch (err) { console.error("Mail error:", err); }
+        }
+      });
     }
 
     // Socket emit

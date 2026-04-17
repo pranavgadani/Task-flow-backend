@@ -316,8 +316,8 @@ export default function Task({ isIssue = false }) {
       showToast("Description is required", "error");
       return;
     }
-    if (!form.assignedTo) {
-      showToast("Please assign a staff member", "error");
+    if (!form.assignedTo || (Array.isArray(form.assignedTo) && form.assignedTo.length === 0)) {
+      showToast("Please assign at least one staff member", "error");
       return;
     }
     if (!form.status) {
@@ -351,7 +351,13 @@ export default function Task({ isIssue = false }) {
 
     fd.append("title", form.title);
     fd.append("description", form.description);
-    fd.append("assignedTo", form.assignedTo);
+    
+    if (Array.isArray(form.assignedTo)) {
+      form.assignedTo.forEach(id => fd.append("assignedTo", id));
+    } else if (form.assignedTo) {
+      fd.append("assignedTo", form.assignedTo);
+    }
+
     fd.append("status", form.status);
     fd.append("project", form.project || "");
     fd.append("type", isIssue ? "issue" : "task");
@@ -444,7 +450,7 @@ export default function Task({ isIssue = false }) {
     setForm({
       title: item.title,
       description: item.description,
-      assignedTo: item.assignedTo?._id || item.assignedTo,
+      assignedTo: Array.isArray(item.assignedTo) ? item.assignedTo.map(u => u._id || u) : (item.assignedTo ? [item.assignedTo?._id || item.assignedTo] : []),
       status: item.status?._id || item.status,
       project: item.project?._id || item.project || "",
       priority: item.priority || "Medium",
@@ -522,20 +528,25 @@ export default function Task({ isIssue = false }) {
       header: "Assigned To",
       key: "assignedTo",
       render: (v) => {
-        if (!v) return <span style={{ color: "#94a3b8" }}>—</span>;
-        const s = typeof v === 'object' ? v : staff.find(u => u._id === v);
-        if (!s) return <span style={{ color: "#94a3b8" }}>—</span>;
+        const assignedList = Array.isArray(v) ? v : (v ? [v] : []);
+        if (assignedList.length === 0) return <span style={{ color: "#94a3b8" }}>Unassigned</span>;
         return (
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <div style={{
-              width: "30px", height: "30px", borderRadius: "50%",
-              background: "linear-gradient(135deg, var(--primary-color), #6366f1)",
-              color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "12px", fontWeight: "800", boxShadow: "0 2px 5px rgba(59, 130, 246, 0.2)"
-            }}>
-              {s.name?.charAt(0).toUpperCase()}
-            </div>
-            <span style={{ fontWeight: "600", color: "var(--text-main)", fontSize: "13px" }}>{s.name}</span>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "2px", maxWidth: "120px" }}>
+            {assignedList.map((user, idx) => {
+              const u = typeof user === 'object' ? user : staff.find(s => s._id === user);
+              if (!u) return null;
+              return (
+                <div key={idx} title={u.name} style={{
+                  width: "24px", height: "24px", borderRadius: "50%",
+                  background: "var(--primary-color)", color: "#fff",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: "10px", fontWeight: "800", border: '1.5px solid #fff',
+                  marginLeft: idx > 0 ? "-8px" : "0", // Overlapping avatar style
+                }}>
+                  {u.name?.charAt(0).toUpperCase()}
+                </div>
+              );
+            })}
           </div>
         );
       },
@@ -755,7 +766,7 @@ export default function Task({ isIssue = false }) {
                 setForm({
                   title: "",
                   description: "",
-                  assignedTo: "",
+                  assignedTo: [],
                   status: "",
                   project: selectedProject?._id || "",
                   priority: "",
@@ -935,7 +946,9 @@ export default function Task({ isIssue = false }) {
         onSave={save}
         loading={loading}
       >
-        <div style={{ marginBottom: "20px" }}>
+        <div style={{ maxHeight: '65vh', overflowY: 'auto', overflowX: 'visible', padding: '10px 5px 200px 5px' }}>
+          <div style={{ marginBottom: "20px" }}>
+
           <label style={{ fontWeight: "700", display: "block", marginBottom: "8px", fontSize: "14px", color: "var(--text-main)" }}>Title <span style={{ color: "red" }}>*</span></label>
           <input
             className="form-control"
@@ -961,11 +974,11 @@ export default function Task({ isIssue = false }) {
               <div style={{
                 position: "absolute",
                 top: "100%", left: 0,
-                background: "#fff",
-                border: "1px solid #e2e8f0",
-                boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-                borderRadius: "8px",
-                zIndex: 10,
+                background: "#ffffff",
+                border: "1px solid var(--ui-border)",
+                boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
+                borderRadius: "12px",
+                zIndex: 10000,
                 width: "250px",
                 maxHeight: "150px",
                 overflowY: "auto",
@@ -1002,64 +1015,93 @@ export default function Task({ isIssue = false }) {
         </div>
 
         <div className="form-group">
-          <label>Assign Staff <span style={{ color: "red" }}>*</span></label>
+          <label style={{ fontWeight: "700", display: "block", marginBottom: "8px", fontSize: "14px", color: "var(--text-main)" }}>Assign Staff <span style={{ color: "red" }}>*</span></label>
           <div style={{ position: 'relative', zIndex: 1050 }} ref={dropdownRef}>
-            <div style={{ position: "relative", marginBottom: "8px" }}>
-               <span style={{ position: "absolute", left: "16px", top: "50%", transform: "translateY(-50%)", color: "#94a3b8", display: "flex", alignItems: "center" }}>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" x2="16.65" y1="21" y2="16.65" /></svg>
-               </span>
-               <input
-                 type="text"
-                 className="form-control"
-                 placeholder={form.assignedTo ? "Change staff member..." : "Choose a staff member..."}
-                 value={memberSearch}
-                 onFocus={() => setIsDropdownOpen(true)}
-                 onClick={() => setIsDropdownOpen(true)}
-                 onChange={(e) => setMemberSearch(e.target.value)}
-                 style={{ paddingLeft: '48px', height: '48px', boxShadow: 'var(--shadow-sm)', cursor: 'text' }}
-               />
+            <div
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              style={{
+                background: "#fdfefe",
+                border: "1.5px solid #e5e7eb",
+                borderRadius: "12px",
+                padding: "8px 15px",
+                minHeight: "48px",
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "6px",
+                alignItems: "center",
+                cursor: "pointer"
+              }}
+            >
+              {Array.isArray(form.assignedTo) && form.assignedTo.length > 0 ? (
+                form.assignedTo.map(staffId => {
+                  const s = getValidStaff().find(u => u._id === staffId);
+                  if (!s) return null;
+                  return (
+                    <div key={staffId} style={{ background: "var(--primary-light)", color: "var(--primary-color)", padding: "2px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}>
+                      {s.name}
+                      <span 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setForm({ ...form, assignedTo: form.assignedTo.filter(id => id !== staffId) });
+                        }}
+                        style={{ cursor: "pointer", fontSize: "14px", fontWeight: "bold" }}
+                      >×</span>
+                    </div>
+                  );
+                })
+              ) : (
+                <span style={{ color: "#9ca3af", fontSize: "14px" }}>Choose staff members...</span>
+              )}
             </div>
 
-            {/* Selection Chip */}
-            {form.assignedTo && !isDropdownOpen && !memberSearch && (
-              <div style={{ marginTop: "12px" }}>
-                 {(() => {
-                    const s = staff.find(u => u._id === form.assignedTo);
-                    if(!s) return null;
-                    return (
-                      <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "6px 12px", borderRadius: "8px", background: "var(--primary-light)", border: "1px solid var(--primary-color)" }}>
-                        <span style={{ fontSize: "13px", fontWeight: "700", color: "var(--primary-color)" }}>{s.name}</span>
-                        <span style={{ cursor: "pointer", marginLeft: "4px", color: "var(--primary-color)" }} onClick={() => setForm({ ...form, assignedTo: "" })}>×</span>
-                      </div>
-                    )
-                 })()}
-              </div>
-            )}
-
-            {/* Dropdown List */}
             {isDropdownOpen && (
-              <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 9999, background: "#ffffff", borderRadius: "12px", maxHeight: "250px", overflowY: "auto", boxShadow: "0 10px 25px rgba(0,0,0,0.15)", marginTop: "8px", border: "1px solid var(--ui-border)", padding: "4px" }}>
+              <div style={{
+                position: "absolute", top: "100%", left: 0, right: 0,
+                marginTop: "8px", background: "#ffffff", borderRadius: "12px",
+                boxShadow: "0 10px 25px rgba(0,0,0,0.1)", border: "1px solid var(--ui-border)",
+                maxHeight: "250px", overflowY: "auto", zIndex: 1100
+              }}>
+                <div style={{ padding: "10px", borderBottom: "1px solid #f3f4f6", position: 'sticky', top: 0, background: '#fff' }}>
+                  <input
+                    className="form-control"
+                    placeholder="Search staff..."
+                    value={memberSearch}
+                    onChange={(e) => setMemberSearch(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ height: '35px', fontSize: '13px' }}
+                  />
+                </div>
                 {getValidStaff()
-                  .filter(s => s.name?.toLowerCase().includes(memberSearch.toLowerCase())).length > 0 ? (
-                    getValidStaff()
-                      .filter(s => s.name?.toLowerCase().includes(memberSearch.toLowerCase()))
-                      .map(s => (
-                          <div
-                            key={s._id}
-                            onClick={() => { setForm({ ...form, assignedTo: s._id }); setMemberSearch(""); setIsDropdownOpen(false); }}
-                            style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 12px", cursor: "pointer", borderRadius: "8px", background: form.assignedTo === s._id ? "var(--primary-light)" : "transparent" }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = "var(--primary-light)"}
-                            onMouseLeave={(e) => e.currentTarget.style.background = form.assignedTo === s._id ? "var(--primary-light)" : "transparent"}
-                          >
-                             <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: "var(--primary-color)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: "800" }}>{s.name?.charAt(0).toUpperCase()}</div>
-                             <div style={{ fontWeight: "600", fontSize: "14px", color: "var(--text-main)" }}>{s.name}</div>
-                          </div>
-                      ))
-                  ) : (
-                    <div style={{ padding: "12px", textAlign: "center", color: "var(--text-muted)", fontSize: "13px" }}>
-                       {staff.length === 0 ? "Loading users..." : "No members found"}
-                    </div>
-                  )}
+                  .filter(s => s.name?.toLowerCase().includes(memberSearch.toLowerCase()))
+                  .map((s) => {
+                    const isSelected = Array.isArray(form.assignedTo) && form.assignedTo.includes(s._id);
+                    return (
+                      <div
+                        key={s._id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          let currentSelected = Array.isArray(form.assignedTo) ? form.assignedTo : (form.assignedTo ? [form.assignedTo] : []);
+                          if (isSelected) {
+                            currentSelected = currentSelected.filter(id => id !== s._id);
+                          } else {
+                            currentSelected = [...currentSelected, s._id];
+                          }
+                          setForm({ ...form, assignedTo: currentSelected });
+                        }}
+                        style={{
+                          padding: "10px 15px", cursor: "pointer", display: "flex",
+                          alignItems: "center", justifyContent: "space-between",
+                          background: isSelected ? "#f8fafc" : "transparent"
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                          <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: "var(--primary-color)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: "800" }}>{s.name?.charAt(0).toUpperCase()}</div>
+                          <div style={{ fontSize: "14px", fontWeight: "600" }}>{s.name}</div>
+                        </div>
+                        {isSelected && <span style={{ color: "var(--primary-color)" }}>✔</span>}
+                      </div>
+                    );
+                  })}
               </div>
             )}
           </div>
@@ -1257,6 +1299,7 @@ export default function Task({ isIssue = false }) {
             </button>
           </div>
         )}
+        </div>
       </FormModal>
 
       {/* ================= DATA VIEW (LIST / KANBAN) ================= */}
@@ -1295,7 +1338,7 @@ export default function Task({ isIssue = false }) {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "12px", flex: 1 }}>
                   {colTasks.map(t => {
-                    const assignedUser = typeof t.assignedTo === 'object' ? t.assignedTo : staff.find(u => u._id === t.assignedTo);
+                    const assignedList = Array.isArray(t.assignedTo) ? t.assignedTo : (t.assignedTo ? [t.assignedTo] : []);
                     return (
                       <div
                         key={t._id}
@@ -1314,11 +1357,24 @@ export default function Task({ isIssue = false }) {
                         <div style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "14px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: "1.5" }}>{t.description}</div>
                         
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          {assignedUser ? (
-                            <div title={assignedUser.name} style={{ width: "26px", height: "26px", borderRadius: "50%", background: "var(--primary-light)", color: "var(--primary-color)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "800", border: "1px solid rgba(59, 130, 246, 0.2)" }}>
-                              {assignedUser.name.charAt(0).toUpperCase()}
-                            </div>
-                          ) : <div />}
+                           <div style={{ display: "flex" }}>
+                             {assignedList.map((user, idx) => {
+                               const u = typeof user === 'object' ? user : staff.find(s => s._id === user);
+                               if (!u) return null;
+                               return (
+                                 <div key={idx} title={u.name} style={{ 
+                                   width: "26px", height: "26px", borderRadius: "50%", 
+                                   background: "var(--primary-light)", color: "var(--primary-color)", 
+                                   display: "flex", alignItems: "center", justifyContent: "center", 
+                                   fontSize: "11px", fontWeight: "800", border: "1px solid #fff",
+                                   marginLeft: idx > 0 ? "-10px" : "0"
+                                 }}>
+                                   {u.name.charAt(0).toUpperCase()}
+                                 </div>
+                               );
+                             })}
+                             {assignedList.length === 0 && <div style={{ height: "26px" }} />}
+                           </div>
                           {isIssue && t.priority && (
                              <span style={{ fontSize: "10.5px", fontWeight: "800", padding: "4px 8px", borderRadius: "6px", background: priorityStyle(t.priority).bg, color: priorityStyle(t.priority).color }}>{t.priority}</span>
                           )}

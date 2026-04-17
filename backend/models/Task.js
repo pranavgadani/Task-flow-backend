@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const TaskSchema = new mongoose.Schema({
   title: String,
   description: String,
-  assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "Staff" },
+  assignedTo: [{ type: mongoose.Schema.Types.ObjectId, ref: "Staff" }],
   status: { type: mongoose.Schema.Types.ObjectId, ref: "TaskStatus" },
   project: { type: mongoose.Schema.Types.ObjectId, ref: "Project" },
   image: String,
